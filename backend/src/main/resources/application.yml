@@ -1,0 +1,27 @@
+spring:
+  application:
+    name: cps-backend
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/cps_db}
+    username: ${SPRING_DATASOURCE_USERNAME:cps_user}
+    password: ${SPRING_DATASOURCE_PASSWORD:cps_password}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+
+server:
+  port: ${SERVER_PORT:8088}
+
+logging:
+  level:
+    com.cps: DEBUG
+    org.springframework.web: INFO
+    org.hibernate: INFO

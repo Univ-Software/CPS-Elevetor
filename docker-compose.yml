@@ -1,0 +1,78 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    container_name: cps_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: cps_db
+      POSTGRES_USER: cps_user
+      POSTGRES_PASSWORD: cps_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app_cps_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cps_user -d cps_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Spring Boot Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cps_backend
+    restart: unless-stopped
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/cps_db
+      SPRING_DATASOURCE_USERNAME: cps_user
+      SPRING_DATASOURCE_PASSWORD: cps_password
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SERVER_PORT: 8088
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - app_cps_net
+    expose:
+      - "8088"
+
+  # React-Vite Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: cps_frontend
+    restart: unless-stopped
+    networks:
+      - app_cps_net
+    expose:
+      - "80"
+
+  # Nginx Reverse Proxy
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    container_name: cps_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - app_cps_net
+
+networks:
+  app_cps_net:
+    driver: bridge
+    name: app_cps_net
+
+volumes:
+  postgres_data:
+    driver: local
