@@ -22,7 +22,7 @@ function App() {
   return (
     <div className="App">
       <header className="App-header">
-        <h1>CPS (Cyber-Physical System)</h1>
+        <h1>CPS ws(Cyber-Physical System)</h1>
         <div className="status-container">
           <h2>System Status</h2>
           {error ? (
