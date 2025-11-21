@@ -1,4 +1,6 @@
-/* 전체 배경 & 레이아웃 – 밝은 크림톤 + 살짝 그래디언트 */
+/* ===========================
+   전체 배경 & 기본 레이아웃
+   =========================== */
 .Dashboard {
   min-height: 100vh;
   padding: 40px 24px;
@@ -27,11 +29,20 @@
   max-width: 1120px;
 }
 
-/* 헤더 – 심플한 타이포 + 보조 텍스트 */
+/* ===========================
+   헤더 영역
+   =========================== */
 .dash-header {
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+.dash-header-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
 }
 
 .dash-header h1 {
@@ -50,10 +61,12 @@
 
 .queue-info {
   font-size: 0.8rem;
-  color: #f97316; /* 살짝 포인트 컬러 */
+  color: #f97316;
 }
 
-/* 메인 레이아웃 – 3분할 */
+/* ===========================
+   메인 3분할 카드 레이아웃
+   =========================== */
 .dash-layout {
   margin-top: 12px;
   display: grid;
@@ -61,7 +74,7 @@
   gap: 20px;
 }
 
-/* 카드 공통 – 밝은 카드 + 얇은 보더 + 부드러운 그림자 */
+/* 공통 카드 스타일 (패널, 샤프트) */
 .panel,
 .shaft {
   position: relative;
@@ -74,7 +87,12 @@
     0 0 0 1px rgba(255, 255, 255, 0.8);
 }
 
-/* 외부/내부 제목 */
+/* 샤프트만 패딩 약간 조정 */
+.shaft {
+  padding: 14px 18px;
+}
+
+/* 카드 제목/부제 */
 .panel h2 {
   margin: 0 0 4px;
   font-size: 0.98rem;
@@ -89,14 +107,15 @@
   color: #9ca3af;
 }
 
-/* 버튼 영역 */
+/* ===========================
+   버튼 (외부/내부 공통)
+   =========================== */
 .panel-buttons {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
-/* 층 버튼 – 테두리형, 가볍게 */
 .floor-btn {
   flex: 1 1 30%;
   min-width: 0;
@@ -120,16 +139,13 @@
     box-shadow 0.15s ease-out;
 }
 
-/* 외부 호출 버튼 – 오렌지 계열 포인트 */
-.floor-btn {
-  /* external 기본 */
-}
+/* 외부 호출 버튼 – 오렌지 톤 */
 .floor-btn:not(.inside) {
   border-color: rgba(248, 153, 59, 0.25);
   background: linear-gradient(135deg, #fff7ed, #ffffff);
 }
 
-/* 내부 버튼 – 블루 계열 포인트 */
+/* 내부 버튼 – 블루 톤 */
 .floor-btn.inside {
   border-color: rgba(59, 130, 246, 0.3);
   background: linear-gradient(135deg, #eff6ff, #ffffff);
@@ -150,12 +166,9 @@
   box-shadow: none;
 }
 
-/* 샤프트 – 더 단정하게 */
-.shaft {
-  padding: 14px 18px;
-}
-
-/* 층별 행 */
+/* ===========================
+   샤프트 / 층 / 엘리베이터
+   =========================== */
 .floor-row {
   display: flex;
   align-items: center;
@@ -174,22 +187,52 @@
   color: #9ca3af;
 }
 
-/* 엘리베이터 캐빈 – 라운드 박스 + 약한 그린 포인트 */
+/* 층 안쪽 (대기 승객 + 엘베) */
+.floor-content {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 층 앞에 서 있는 승객들 */
+.floor-waiting {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 40px;
+}
+
+/* 엘리베이터 캐빈 – 공통 레이아웃 */
 .elevator-car {
   margin-left: 10px;
   width: 90px;
   height: 42px;
   border-radius: 14px;
-  background: linear-gradient(135deg, #4ade80, #bbf7d0);
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
   overflow: hidden;
 
+  transition:
+    background 0.18s ease-out,
+    box-shadow 0.18s ease-out;
+}
+
+/* 문 닫힘: 초록 */
+.elevator-car.closed {
+  background: linear-gradient(135deg, #4ade80, #bbf7d0);
   box-shadow: 0 12px 24px rgba(22, 163, 74, 0.25);
 }
 
+/* 문 열림: 빨강 */
+.elevator-car.open {
+  background: linear-gradient(135deg, #f97373, #fecaca);
+  box-shadow: 0 12px 24px rgba(220, 38, 38, 0.3);
+}
+
+/* 캐빈 내부 문 */
 .car-door {
   width: 86%;
   height: 78%;
@@ -198,32 +241,52 @@
   background: linear-gradient(135deg, #ffffff, #f3f4f6);
 }
 
-/* 푸터 */
-.dash-footer {
-  margin-top: 8px;
-  font-size: 0.78rem;
-  color: #9ca3af;
-  text-align: left;
+/* 엘베 안의 사람들 위치 */
+.car-people {
+  position: absolute;
+  inset: 4px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 3px;
 }
 
-/* 반응형 */
-@media (max-width: 900px) {
-  .dash-layout {
-    grid-template-columns: minmax(0, 1fr);
+/* ===========================
+   사람(승객) 표시
+   =========================== */
+.passenger-dot {
+  width: 10px;
+  height: 14px;
+  border-radius: 3px;
+  background: #f97316;
+  box-shadow: 0 4px 8px rgba(15, 23, 42, 0.12);
+  animation: passenger-pop-in 0.18s ease-out;
+}
+
+/* 대기 중 – 층 앞 */
+.passenger-dot.waiting {
+  background: linear-gradient(135deg, #fed7aa, #fdba74);
+}
+
+/* 탑승 중 – 엘베 안 */
+.passenger-dot.inside {
+  background: linear-gradient(135deg, #60a5fa, #93c5fd);
+}
+
+@keyframes passenger-pop-in {
+  from {
+    transform: translateY(4px) scale(0.6);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
   }
 }
 
-@media (max-width: 600px) {
-  .Dashboard {
-    padding: 24px 16px;
-  }
-
-  .dash-header h1 {
-    font-size: 1.8rem;
-  }
-}
-
-/* 승객 생성 섹션 */
+/* ===========================
+   승객 생성 / 리스트 패널
+   =========================== */
 .passenger-section {
   margin-top: 18px;
   padding-top: 14px;
@@ -303,7 +366,7 @@
   box-shadow: none;
 }
 
-/* 승객 목록 */
+/* 승객 리스트 */
 .passenger-list {
   margin-top: 6px;
   display: flex;
@@ -350,60 +413,105 @@
   color: #16a34a;
 }
 
-/* 층 안쪽 컨테이너 */
-.floor-content {
-  flex: 1;
+/* ===========================
+   문 상태 표시 + 버튼
+   =========================== */
+.door-controls {
   display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-/* 층 앞에서 기다리는 승객들 */
-.floor-waiting {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  min-width: 40px; /* 사람 몇 명 서 있어도 살짝 여유 */
-}
-
-/* 사람 네모 기본 모양 */
-.passenger-dot {
-  width: 10px;
-  height: 14px;
-  border-radius: 3px;
-  background: #f97316; /* 기본: 오렌지 */
-  box-shadow: 0 4px 8px rgba(15, 23, 42, 0.12);
-  animation: passenger-pop-in 0.18s ease-out;
-}
-
-/* 대기 중(층 앞에 서 있음) */
-.passenger-dot.waiting {
-  background: linear-gradient(135deg, #fed7aa, #fdba74);
-}
-
-/* 탑승 중(엘리베이터 안) */
-.passenger-dot.inside {
-  background: linear-gradient(135deg, #60a5fa, #93c5fd);
-}
-
-/* 엘리베이터 안에서 사람들 위치 */
-.car-people {
-  position: absolute;
-  inset: 4px;
-  display: flex;
+  flex-direction: column;
   align-items: flex-end;
-  justify-content: center;
-  gap: 3px;
+  gap: 6px;
 }
 
-/* 살짝 튀어나오는 애니메이션 */
-@keyframes passenger-pop-in {
-  from {
-    transform: translateY(4px) scale(0.6);
-    opacity: 0;
+.door-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.door-indicator-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.6);
+}
+
+.door-indicator-dot.closed {
+  background: #4ade80; /* 닫힘: 초록 */
+}
+
+.door-indicator-dot.open {
+  background: #f97373; /* 열림: 빨강 */
+}
+
+.door-indicator-label {
+  font-size: 0.8rem;
+  color: #4b5563;
+}
+
+/* 문 열림/닫힘 버튼 */
+.door-buttons {
+  display: flex;
+  gap: 6px;
+}
+
+.door-btn {
+  border-radius: 999px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  padding: 4px 10px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition:
+    background-color 0.12s ease-out,
+    border-color 0.12s ease-out,
+    transform 0.06s ease-out,
+    box-shadow 0.12s ease-out;
+}
+
+.door-btn.open {
+  border-color: rgba(248, 113, 113, 0.5);
+}
+
+.door-btn.close {
+  border-color: rgba(34, 197, 94, 0.4);
+}
+
+.door-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08);
+}
+
+.door-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+  box-shadow: none;
+}
+
+/* ===========================
+   푸터 & 반응형
+   =========================== */
+.dash-footer {
+  margin-top: 8px;
+  font-size: 0.78rem;
+  color: #9ca3af;
+  text-align: left;
+}
+
+/* 태블릿 이하 1열 레이아웃 */
+@media (max-width: 900px) {
+  .dash-layout {
+    grid-template-columns: minmax(0, 1fr);
   }
-  to {
-    transform: translateY(0) scale(1);
-    opacity: 1;
+}
+
+/* 모바일 여백 조정 */
+@media (max-width: 600px) {
+  .Dashboard {
+    padding: 24px 16px;
+  }
+
+  .dash-header h1 {
+    font-size: 1.8rem;
   }
 }

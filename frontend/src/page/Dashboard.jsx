@@ -6,16 +6,19 @@ const FLOORS = [5, 4, 3, 2, 1] // 위에서 아래로 표시용
 
 function Dashboard() {
   const [currentFloor, setCurrentFloor] = useState(1)
-  const [queue, setQueue] = useState([]) // 가야 할 층들: [5, 3] 이런 식
+  const [queue, setQueue] = useState([]) // 가야 할 층들
   const [direction, setDirection] = useState("idle") // "up" | "down" | "idle"
 
-  // 승객 관련 상태
+  // 문 상태
+  const [doorOpen, setDoorOpen] = useState(false)
+
+  // 승객 상태
   const [passengers, setPassengers] = useState([]) // {id, from, to, status}
   const [spawnFloor, setSpawnFloor] = useState(1)
   const [targetFloor, setTargetFloor] = useState(5)
   const [nextPassengerId, setNextPassengerId] = useState(1)
 
-  // 층 호출 (외부/내부/승객 공용)
+  // 층 호출 함수 (외부/내부/승객 공용)
   const requestFloor = (floor) => {
     setQueue((prev) => {
       if (prev.includes(floor) || floor === currentFloor) return prev
@@ -35,18 +38,76 @@ function Dashboard() {
       id: nextPassengerId,
       from: spawnFloor,
       to: targetFloor,
-      status: "waiting", // waiting | onboard | done
+      status: "waiting", // 항상 대기부터 시작
     }
 
     setPassengers((prev) => [...prev, newPassenger])
     setNextPassengerId((id) => id + 1)
 
-    // 엘리베이터를 출발층으로 먼저 호출
-    requestFloor(spawnFloor)
+    // 엘리베이터가 다른 층에 있으면 출발층으로 먼저 호출
+    if (spawnFloor !== currentFloor) {
+      requestFloor(spawnFloor)
+    }
+    // 같은 층이면: 일단 그 층에서 기다리게 두고, 사용자가 문 열면 탑승
+  }
+
+  // 문 열기: 현재 층 기준으로 탑승/하차 처리
+  const handleOpenDoor = () => {
+    if (doorOpen) return
+    setDoorOpen(true)
+
+    setPassengers((prev) => {
+      const boardingTargets = []
+      const updated = prev.map((p) => {
+        // 대기 승객 + 현재 층 = 탑승
+        if (p.status === "waiting" && p.from === currentFloor) {
+          boardingTargets.push(p.to)
+          return { ...p, status: "onboard" }
+        }
+        // 탑승 중 승객 + 목적층 도착 = 하차
+        if (p.status === "onboard" && p.to === currentFloor) {
+          return { ...p, status: "done" }
+        }
+        return p
+      })
+
+      if (boardingTargets.length > 0) {
+        setQueue((prevQ) => {
+          let q = [...prevQ]
+          for (const dest of boardingTargets) {
+            if (!q.includes(dest) && dest !== currentFloor) {
+              q.push(dest)
+            }
+          }
+          return q
+        })
+      }
+
+      return updated
+    })
+  }
+
+  // 문 닫기: 현재 층이 queue[0]이면 그 층 방문 완료 → queue에서 제거
+  const handleCloseDoor = () => {
+    if (!doorOpen) return
+    setDoorOpen(false)
+
+    setQueue((prev) => {
+      if (prev.length > 0 && prev[0] === currentFloor) {
+        return prev.slice(1)
+      }
+      return prev
+    })
   }
 
   // 엘리베이터 이동 로직
   useEffect(() => {
+    // 문 열려 있으면 이동하지 않음
+    if (doorOpen) {
+      setDirection("idle")
+      return
+    }
+
     if (queue.length === 0) {
       setDirection("idle")
       return
@@ -54,9 +115,8 @@ function Dashboard() {
 
     const target = queue[0]
 
+    // 목표층에 이미 도착했는데 문이 닫혀 있음 → 사용자가 열고/닫을 때까지 대기
     if (target === currentFloor) {
-      // 목표 층에 이미 도착했으면 큐에서 제거
-      setQueue((prev) => prev.slice(1))
       setDirection("idle")
       return
     }
@@ -68,34 +128,8 @@ function Dashboard() {
     }, 600)
 
     return () => clearTimeout(id)
-  }, [queue, currentFloor])
+  }, [queue, currentFloor, doorOpen])
 
-  // 현재 층에 도착할 때 승객 태우기/내리기
-  useEffect(() => {
-    setPassengers((prev) => {
-      let changed = false
-      const updated = prev.map((p) => {
-        // 아직 기다리는 승객이고, 출발층에 엘리베이터 도착 → 탑승
-        if (p.status === "waiting" && p.from === currentFloor) {
-          changed = true
-          // 탑승한 순간, 그 승객의 목적지 층도 큐에 추가
-          requestFloor(p.to)
-          return { ...p, status: "onboard" }
-        }
-
-        // 엘리베이터 안에 있고, 목적 층에 도착 → 하차
-        if (p.status === "onboard" && p.to === currentFloor) {
-          changed = true
-          return { ...p, status: "done" }
-        }
-
-        return p
-      })
-      return changed ? updated : prev
-    })
-  }, [currentFloor])
-
-  // 화면에 보여줄 승객 목록 (도착해서 끝난 승객은 숨김)
   const visiblePassengers = passengers.filter((p) => p.status !== "done")
 
   const statusLabel =
@@ -111,14 +145,50 @@ function Dashboard() {
   return (
     <div className="Dashboard">
       <header className="dash-header">
-        <h1>CPS Elevator Simulator</h1>
-        <p>
-          현재 층: <b>{currentFloor}</b>{" "}
-          <span style={{ color: statusColor }}>({statusLabel})</span>
-        </p>
-        <p className="queue-info">
-          대기 큐: {queue.length === 0 ? "없음" : queue.join(" → ")}
-        </p>
+        <div className="dash-header-main">
+          <div>
+            <h1>CPS Elevator Simulator</h1>
+            <p>
+              현재 층: <b>{currentFloor}</b>{" "}
+              <span style={{ color: statusColor }}>({statusLabel})</span>
+            </p>
+            <p className="queue-info">
+              대기 큐: {queue.length === 0 ? "없음" : queue.join(" → ")}
+            </p>
+          </div>
+
+          {/* 문 상태 표시 + 제어 */}
+          <div className="door-controls">
+            <div className="door-indicator">
+              <span
+                className={`door-indicator-dot ${
+                  doorOpen ? "open" : "closed"
+                }`}
+              />
+              <span className="door-indicator-label">
+                문 {doorOpen ? "열림" : "닫힘"}
+              </span>
+            </div>
+            <div className="door-buttons">
+              <button
+                type="button"
+                className="door-btn open"
+                onClick={handleOpenDoor}
+                disabled={doorOpen}
+              >
+                열림
+              </button>
+              <button
+                type="button"
+                className="door-btn close"
+                onClick={handleCloseDoor}
+                disabled={!doorOpen}
+              >
+                닫힘
+              </button>
+            </div>
+          </div>
+        </div>
       </header>
 
       <div className="dash-layout">
@@ -139,12 +209,10 @@ function Dashboard() {
           </div>
         </div>
 
-        {/* 엘리베이터 샤프트 + 캐빈 */}
+        {/* 엘리베이터 샤프트 + 캐빈 + 사람 네모 */}
         <div className="shaft">
           {FLOORS.map((f) => {
-            const activePassengers = passengers.filter(
-              (p) => p.status !== "done"
-            )
+            const activePassengers = visiblePassengers
             const waitingHere = activePassengers.filter(
               (p) => p.status === "waiting" && p.from === f
             )
@@ -155,9 +223,8 @@ function Dashboard() {
             return (
               <div key={f} className="floor-row">
                 <span className="floor-label">{f}F</span>
-
                 <div className="floor-content">
-                  {/* 층에서 기다리는 사람들(네모) */}
+                  {/* 층에서 기다리는 사람들 */}
                   <div className="floor-waiting">
                     {waitingHere.map((p) => (
                       <div
@@ -170,7 +237,11 @@ function Dashboard() {
 
                   {/* 엘리베이터 캐빈 + 탑승 승객들 */}
                   {currentFloor === f && (
-                    <div className="elevator-car">
+                    <div
+                      className={`elevator-car ${
+                        doorOpen ? "open" : "closed"
+                      }`}
+                    >
                       <div className="car-door" />
                       <div className="car-people">
                         {onboardPassengers.map((p) => (
@@ -188,7 +259,6 @@ function Dashboard() {
             )
           })}
         </div>
-
 
         {/* 내부 패널 + 승객 생성/목록 */}
         <div className="panel">
