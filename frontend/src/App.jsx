@@ -1,10 +1,17 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import './App.css'
 
 function App() {
   const [backendStatus, setBackendStatus] = useState('Checking...')
   const [error, setError] = useState(null)
+
+  const navigate = useNavigate()
+
+  const handleStart = () => {
+    navigate('/dashboard')
+  }
 
   useEffect(() => {
     // Check backend health through nginx proxy
@@ -22,7 +29,7 @@ function App() {
   return (
     <div className="App">
       <header className="App-header">
-        <h1>CPS ws(Cyber-Physical System)</h1>
+        <h1>CPS(Cyber-Physical System)</h1>
         <div className="status-container">
           <h2>System Status</h2>
           {error ? (
@@ -36,7 +43,11 @@ function App() {
           <p>Frontend: React + Vite</p>
           <p>Network: app_cps_net</p>
         </div>
+        <button className="btn" onClick={handleStart}>Start</button>
       </header>
+      <footer className='footer'>
+        <p>© 2025 CPS Elevator System</p>
+      </footer>
     </div>
   )
 }
