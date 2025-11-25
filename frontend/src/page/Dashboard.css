@@ -515,3 +515,20 @@
     font-size: 1.8rem;
   }
 }
+
+/* 정원 / 현재 인원 표시 */
+.capacity-info {
+  margin-top: 4px;
+  font-size: 0.8rem;
+  color: #9ca3af;
+}
+
+.capacity-count {
+  font-weight: 600;
+  color: #4b5563;
+}
+
+.capacity-count.full {
+  color: #dc2626; /* 꽉 찼을 때 빨간 포인트 */
+}
+

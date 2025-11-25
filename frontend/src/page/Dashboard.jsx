@@ -3,6 +3,7 @@ import { useState, useEffect } from "react"
 import "./Dashboard.css"
 
 const FLOORS = [5, 4, 3, 2, 1]
+const MAX_CAPACITY = 5
 
 // 문 동작 시간(ms) – 실제는 몇 초지만 데모용으로 조금 빠르게
 const DOOR_OPEN_TIME = 700
@@ -24,6 +25,9 @@ function Dashboard() {
 
   const visiblePassengers = passengers.filter((p) => p.status !== "done")
   const doorLooksOpen = doorState === "open" || doorState === "opening"
+
+  const onboardCount = passengers.filter((p) => p.status === "onboard").length
+  const isFull = onboardCount >= MAX_CAPACITY
 
   // -------------------------
   // 층 호출 / 승객 추가
@@ -52,14 +56,8 @@ function Dashboard() {
     setPassengers((prev) => [...prev, newPassenger])
     setNextPassengerId((id) => id + 1)
 
-    if (spawnFloor !== currentFloor) {
-      // 다른 층이면 해당 층으로 이동 큐에 추가
-      requestFloor(spawnFloor)
-    } else {
-      // 현재 층에서 사람이 생겼고 문이 닫히는 중/닫힘이면 → 다시 열기
-      if (doorState === "closed" || doorState === "closing") {
-        setDoorState("opening")
-      }
+    if (spawnFloor === currentFloor &&(doorState === "closed" || doorState === "closing") ) {
+      setDoorState("opening")
     }
   }
 
@@ -75,7 +73,7 @@ function Dashboard() {
   const handleDoorCloseButton = () => {
     // 이미 닫혀있거나 닫히는 중이면 무시
     if (doorState === "closed" || doorState === "closing") return
-    setDoorState("closing") // 실제 엘베처럼 dwell 무시하고 바로 닫힘 시작
+    setDoorState("closing") // dwell 무시하고 바로 닫힘 시작
   }
 
   // -------------------------
@@ -140,23 +138,34 @@ function Dashboard() {
   }, [doorState, currentFloor])
 
   // -------------------------
-  // 문이 "완전히 열린 순간" 탑승/하차 처리
+  // 문이 "완전히 열린 순간" 탑승/하차 + 정원 체크
   // -------------------------
   useEffect(() => {
     if (doorState !== "open") return
 
     setPassengers((prev) => {
+      // 현재 탑승 중인 승객 수
+      let onboard = prev.filter((p) => p.status === "onboard").length
+      let availableSlots = MAX_CAPACITY - onboard
+
       const boardingTargets = []
       const updated = prev.map((p) => {
-        // 현재 층에서 기다리던 승객 → 탑승
-        if (p.status === "waiting" && p.from === currentFloor) {
+        // 현재 층에서 기다리던 승객 → 정원 남아 있을 때만 탑승
+        if (
+          p.status === "waiting" &&
+          p.from === currentFloor &&
+          availableSlots > 0
+        ) {
           boardingTargets.push(p.to)
+          availableSlots -= 1
           return { ...p, status: "onboard" }
         }
+
         // 탑승 중이고 목적층에 도착 → 하차
         if (p.status === "onboard" && p.to === currentFloor) {
           return { ...p, status: "done" }
         }
+
         return p
       })
 
@@ -201,6 +210,14 @@ function Dashboard() {
             </p>
             <p className="queue-info">
               대기 큐: {queue.length === 0 ? "없음" : queue.join(" → ")}
+            </p>
+
+            {/* 정원 표시 */}
+            <p className="capacity-info">
+              정원 {MAX_CAPACITY}명 ·{" "}
+              <span className={`capacity-count ${isFull ? "full" : ""}`}>
+                현재 {onboardCount}명
+              </span>
             </p>
           </div>
 
