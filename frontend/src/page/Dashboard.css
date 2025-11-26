@@ -444,12 +444,12 @@ body {
 
 .car-door.side.door-opening .door-panel.left,
 .car-door.side.door-open .door-panel.left {
-  transform: translateX(-100%);
+  transform: translateX(-101%);
 }
 
 .car-door.side.door-opening .door-panel.right,
 .car-door.side.door-open .door-panel.right {
-  transform: translateX(100%);
+  transform: translateX(101%);
 }
 
 .car-door.side.door-closing .door-panel.left,
@@ -488,4 +488,56 @@ body {
   font-size: 0.8rem;
   color: #9ca3af;
   text-align: center;
+}
+
+.unload-btn {
+  margin-left: 8px;
+  padding: 2px 8px;
+  font-size: 11px;
+  border-radius: 4px;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  cursor: pointer;
+}
+.unload-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* 끼임 승객(빨간 네모) */
+.passenger-dot.jammed {
+  background-color: #ef4444; /* 빨간색 */
+}
+
+/* 승객 리스트에서 끼임 승객 표시 */
+.passenger-item.jammed-item .passenger-route {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+/* 끼임 승객 생성 버튼 */
+.jam-section {
+  margin-top: 16px;
+  padding-top: 8px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.jam-btn {
+  padding: 6px 10px;
+  font-size: 12px;
+  border-radius: 6px;
+  border: 1px solid #ef4444;
+  background: #fef2f2;
+  color: #b91c1c;
+  cursor: pointer;
+}
+
+.jam-btn:hover {
+  background: #fee2e2;
+}
+
+.jam-hint {
+  margin-top: 6px;
+  font-size: 11px;
+  color: #6b7280;
 }
