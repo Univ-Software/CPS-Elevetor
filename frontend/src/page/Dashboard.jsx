@@ -60,7 +60,7 @@ function floorIndexFromBottom(floor) {
 // doorState: "closed" | "opening" | "open" | "closing"
 function Dashboard() {
   const [currentFloor, setCurrentFloor] = useState(1) // 논리 층
-  const [carFloor, setCarFloor] = useState(1) // 화면 캐빈 층
+  const [carFloor, setCarFloor] = useState(1) // 화면 캐빈 층 (소수층 포함 가능)
   const [queue, setQueue] = useState([])
   const [direction, setDirection] = useState("idle")
   const [doorState, setDoorState] = useState("closed")
@@ -95,7 +95,11 @@ function Dashboard() {
   const isOverload = onboardWeightKg > MAX_LOAD_KG
   const hasJammedOnboard = onboardPassengers.some((p) => p.isJammed)
 
-  // 화면상 이동 중인지: carFloor와 currentFloor가 다르면 이동 중
+  // 정위치 정차 실패 관련 상태
+  const [misalignMode, setMisalignMode] = useState(false) // "다음 정차 시 실패" 플래그
+  const [isMisaligned, setIsMisaligned] = useState(false) // 현재 정위치 실패 상태 여부
+
+  // 화면상 이동 중인지: carFloor와 currentFloor가 다르면 이동 중으로 간주
   const isMoving = carFloor !== currentFloor
 
   // -------------------------
@@ -163,9 +167,6 @@ function Dashboard() {
 
   // -------------------------
   // 끼임 승객 생성 (빨간색)
-  // - 내부 패널 밑의 버튼에서 호출
-  // - 출발층: 현재 층
-  // - 목적층: (현재층이 5층이면 1층, 아니면 5층) 정도로 간단히
   // -------------------------
   const handleAddJammedPassenger = () => {
     const from = currentFloor
@@ -187,10 +188,21 @@ function Dashboard() {
     setPassengers((prev) => [...prev, newPassenger])
     setNextPassengerId((id) => id + 1)
 
-    // 이미 현재 층에 있고 문이 닫혀 있다면, 끼임 승객이 서 있는 상황 가정하고 문 열기
     if (from === currentFloor && doorState === "closed" && !isMoving) {
       setDoorState("opening")
     }
+  }
+
+  // -------------------------
+  // 정위치 정차 실패 모드 ON (다음 정차에서 발동)
+  // -------------------------
+  const handleStartMisalignTest = () => {
+    if (isMisaligned) {
+      alert("이미 정위치 정차 실패 상태입니다. 먼저 정위치 자동 수정을 해주세요.")
+      return
+    }
+    // 그냥 플래그만 켜두면, 다음 이동에서 한 번만 사용됨
+    setMisalignMode(true)
   }
 
   // -------------------------
@@ -257,6 +269,7 @@ function Dashboard() {
   // 엘리베이터 이동 로직 (연속 이동)
   // - queue[0]까지 한 번에 쭉 이동
   // - 이동 시간 = 층 수 × TIME_PER_FLOOR
+  // - misalignMode가 켜져 있으면, 목적층 근처의 랜덤 소수층으로 정차
   // -------------------------
   useEffect(() => {
     // 문이 열려 있으면 이동 금지
@@ -288,8 +301,23 @@ function Dashboard() {
     setMoveDuration(travelTime)
     setDirection(target > currentFloor ? "up" : "down")
 
-    // 화면용 캐빈 위치를 "바로 목적층"으로 설정
-    setCarFloor(target)
+    // ---- 정위치 실패 모드 적용 ----
+    let visualTargetFloor = target
+    if (misalignMode && !isMisaligned) {
+      // target 층 근처에서 ±0.4층 정도 랜덤 오프셋
+      const OFFSET_RANGE = 0.4
+      const offset = (Math.random() * 2 - 1) * OFFSET_RANGE // -0.4 ~ +0.4
+      let misFloor = target + offset
+      // 1층 ~ 5층 범위 안으로만 클램프
+      if (misFloor < 1) misFloor = 1
+      if (misFloor > 5) misFloor = 5
+
+      visualTargetFloor = misFloor
+      setIsMisaligned(true)
+    }
+
+    // 화면용 캐빈 위치를 "목표(또는 오프셋된) 층"으로 설정
+    setCarFloor(visualTargetFloor)
 
     // 이 시점 기준으로 실제 속도 측정에 사용할 시간 저장
     moveRef.current = { floor: currentFloor, time: performance.now() }
@@ -297,32 +325,37 @@ function Dashboard() {
     // travelTime 뒤에 논리 층을 한 번에 target으로 갱신
     const id = setTimeout(() => {
       setCurrentFloor(target)
+      // 한 번 발동 후에는 모드 해제 (다음 정차는 다시 정상)
+      if (misalignMode) {
+        setMisalignMode(false)
+      }
     }, travelTime)
 
     return () => {
       void id
     }
-  }, [queue, currentFloor, doorState, isMoving])
+  }, [queue, currentFloor, doorState, isMoving, misalignMode, isMisaligned])
 
   // -------------------------
   // 도착 후 멈춘 상태에서만 문 자동 열기
+  //  - isMisaligned 상태에서는 문이 자동으로 열리지 않음
   // -------------------------
   useEffect(() => {
     if (doorState !== "closed") return
     if (queue.length === 0) return
     if (isMoving) return
+    if (isMisaligned) return // 정위치 실패 상태에서는 문 자동 오픈 금지
 
     const target = queue[0]
     if (target === currentFloor && carFloor === currentFloor) {
       setDoorState("opening")
     }
-  }, [doorState, queue, currentFloor, carFloor, isMoving])
+  }, [doorState, queue, currentFloor, carFloor, isMoving, isMisaligned])
 
   // -------------------------
   // 문 상태 타이밍 (opening → open → closing → closed)
   //  + 끼임 승객 로직:
   //    - closing 상태에서 끼임 승객이 onboard면 "closed"로 가지 않고 계속 closing 유지
-  //    - 끼임 승객이 사라지면(effect 재실행) 그때부터 정상적으로 닫힘
   // -------------------------
   useEffect(() => {
     let timerId
@@ -341,9 +374,7 @@ function Dashboard() {
     } else if (doorState === "closing") {
       if (hasJammedOnboard) {
         // 끼임 승객이 탑승 중이면 문이 끝까지 닫히지 않음
-        // -> "닫히는 중" 상태를 유지 (타이머 없이 대기)
-        // jam이 해소되면(hasJammedOnboard false) effect가 다시 돌면서
-        // 아래 else branch로 들어가고, 그때 닫힘 완료됨
+        // -> "닫히는 중" 상태를 유지
       } else {
         timerId = setTimeout(() => {
           setDoorState("closed")
@@ -393,6 +424,47 @@ function Dashboard() {
       return updated
     })
   }, [doorState, currentFloor, direction])
+
+  // -------------------------
+  // 정위치 자동 수정
+  // - 현재 carFloor(소수층)를 가장 가까운 정수 층으로 이동
+  // - 이동 후 currentFloor를 그 층으로 맞추고 isMisaligned 해제
+  // -------------------------
+  const handleFixMisalign = () => {
+    if (!isMisaligned) {
+      alert("현재 정위치 정차 실패 상태가 아닙니다.")
+      return
+    }
+
+    // 가장 가까운 정수 층 (1~5 사이로 클램프)
+    let nearestFloor = Math.round(carFloor)
+    if (nearestFloor < 1) nearestFloor = 1
+    if (nearestFloor > 5) nearestFloor = 5
+
+    const distanceFloors = Math.abs(nearestFloor - carFloor)
+    // 정위치 오차는 작다고 가정하므로 distanceFloors는 보통 0.x
+    const travelTime = TIME_PER_FLOOR * distanceFloors
+
+    // 0인 경우(이미 딱 층에 맞아 있는 경우) 바로 해제
+    if (travelTime === 0) {
+      setCarFloor(nearestFloor)
+      setCurrentFloor(nearestFloor)
+      setIsMisaligned(false)
+      return
+    }
+
+    setMoveDuration(travelTime)
+    setDirection(nearestFloor > carFloor ? "up" : "down")
+    setCarFloor(nearestFloor)
+
+    moveRef.current = { floor: currentFloor, time: performance.now() }
+
+    setTimeout(() => {
+      setCurrentFloor(nearestFloor)
+      setIsMisaligned(false)
+      // 이후 자동 문 열림 useEffect가 조건을 만족하면 문을 열어 줌
+    }, travelTime)
+  }
 
   // -------------------------
   // 엘리베이터 위치 계산 (시각용은 carFloor 사용)
@@ -515,6 +587,32 @@ function Dashboard() {
             </button>
             <p className="jam-hint">
               빨간 승객이 탑승 중이면 문이 닫히지 않고 "닫히는 중" 상태로 유지됩니다.
+            </p>
+          </div>
+
+          {/* 정위치 정차 실패 테스트 */}
+          <div className="level-section">
+            <h3>정위치 정차 실패 테스트</h3>
+            <button
+              type="button"
+              className="level-error-btn"
+              onClick={handleStartMisalignTest}
+            >
+              다음 정차 시 정위치 실패 발생
+            </button>
+            <button
+              type="button"
+              className="level-fix-btn"
+              onClick={handleFixMisalign}
+              disabled={!isMisaligned}
+            >
+              정위치 자동 수정
+            </button>
+            <p className="level-hint">
+              정위치 실패 모드를 켜면 다음 목표 층에서 1~5층 사이 랜덤 위치에
+              정차하고, 문이 열리지 않습니다.{" "}
+              &quot;정위치 자동 수정&quot;을 누르면 가장 가까운 층으로 이동한 뒤
+              정상 동작합니다.
             </p>
           </div>
         </div>
@@ -673,7 +771,6 @@ function Dashboard() {
                         : "완료"}
                     </span>
 
-                    {/* 탑승 중 승객은 문이 열려 있을 때 "내리기" 버튼 활성화 */}
                     {p.status === "onboard" && (
                       <button
                         type="button"
