@@ -19,6 +19,9 @@ dependencies {
     // Spring Boot Starter Web
     implementation 'org.springframework.boot:spring-boot-starter-web'
 
+    // Spring Boot Starter WebSocket
+    implementation 'org.springframework.boot:spring-boot-starter-websocket'
+
     // Spring Boot Starter Data JPA
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 
