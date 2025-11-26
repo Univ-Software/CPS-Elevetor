@@ -1,0 +1,543 @@
+:root {
+  --card-radius: 32px;
+  --accent: #fb923c;
+  --accent-soft: rgba(251, 146, 60, 0.18);
+  --primary: #2563eb;
+  --muted: #6b7280;
+  --bg-soft: #f3f4f6;
+  --shadow-soft: 0 24px 60px rgba(15, 23, 42, 0.18);
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+    "Segoe UI", sans-serif;
+  background: radial-gradient(circle at 0% 0%, #fef3c7, #e5e7eb);
+}
+
+.Dashboard {
+  min-height: 100vh;
+  padding: 32px 64px 40px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 헤더 */
+
+.dash-header {
+  margin-bottom: 24px;
+}
+
+.dash-header-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 32px;
+}
+
+.dash-header h1 {
+  margin: 0 0 8px;
+  font-size: 2.4rem;
+  letter-spacing: 0.04em;
+  color: #111827;
+}
+
+.queue-info,
+.capacity-info,
+.speed-info {
+  margin: 3px 0;
+  font-size: 0.95rem;
+  color: #4b5563;
+}
+
+.capacity-count.full {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+.speed-info {
+  margin-top: 6px;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+/* 문 상태 */
+
+.door-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.door-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.door-indicator-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #22c55e;
+  box-shadow: 0 0 0 5px rgba(34, 197, 94, 0.2);
+}
+
+.door-indicator-dot.closed {
+  background: #ef4444;
+  box-shadow: 0 0 0 5px rgba(239, 68, 68, 0.2);
+}
+
+.door-indicator-label {
+  font-size: 0.9rem;
+  color: #374151;
+}
+
+.door-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.door-btn {
+  min-width: 60px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: none;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.1s ease,
+    background-color 0.15s ease;
+}
+
+.door-btn.open {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.door-btn.close {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.door-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+  box-shadow: none;
+  transform: none;
+}
+
+.door-btn:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 16px rgba(15, 23, 42, 0.12);
+}
+
+/* 메인 3분할 */
+
+.dash-layout {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 260px minmax(420px, 1.4fr) 280px;
+  gap: 32px;
+}
+
+/* 카드 */
+
+.panel {
+  background: #ffffff;
+  border-radius: var(--card-radius);
+  box-shadow: var(--shadow-soft);
+  padding: 24px 22px 26px;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.panel h2 {
+  margin: 0 0 4px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.panel-subtitle {
+  margin: 0 0 16px;
+  font-size: 0.8rem;
+  color: #9ca3af;
+}
+
+/* 버튼들 */
+
+.panel-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.floor-btn {
+  flex: 1 1 30%;
+  min-width: 50px;
+  padding: 7px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: #f9fafb;
+  font-size: 0.9rem;
+  color: #111827;
+  cursor: pointer;
+  transition: background-color 0.12s ease, transform 0.1s ease,
+    box-shadow 0.1s ease;
+}
+
+.floor-btn.inside {
+  background: #eff6ff;
+  border-color: rgba(59, 130, 246, 0.5);
+}
+
+.floor-btn:hover {
+  background: #e5e7eb;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 14px rgba(15, 23, 42, 0.08);
+}
+
+/* 승객 폼/리스트 */
+
+.passenger-section {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.passenger-section h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: #111827;
+}
+
+.passenger-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.field label {
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.field select {
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.7);
+  padding: 6px 10px;
+  font-size: 0.85rem;
+  outline: none;
+}
+
+.add-passenger-btn {
+  grid-column: 1 / -1;
+  border-radius: 999px;
+  border: none;
+  padding: 9px 12px;
+  background: linear-gradient(90deg, #fb923c, #f97316);
+  color: #ffffff;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: 0 12px 30px rgba(248, 113, 22, 0.35);
+  transition: transform 0.1s ease, box-shadow 0.1s ease,
+    filter 0.15s ease;
+}
+
+.add-passenger-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 18px 40px rgba(248, 113, 22, 0.45);
+  filter: brightness(1.03);
+}
+
+.passenger-list {
+  margin-top: 6px;
+  border-radius: 18px;
+  background: #f9fafb;
+  padding: 10px 12px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.passenger-empty {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #9ca3af;
+}
+
+.passenger-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+  padding: 4px 0;
+}
+
+.passenger-route {
+  color: #111827;
+}
+
+.passenger-status {
+  font-size: 0.8rem;
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.passenger-status.waiting {
+  background: rgba(251, 191, 36, 0.18);
+  color: #92400e;
+}
+
+.passenger-status.onboard {
+  background: rgba(22, 163, 74, 0.18);
+  color: #166534;
+}
+
+.passenger-status.done {
+  background: rgba(148, 163, 184, 0.25);
+  color: #4b5563;
+}
+
+/* 중앙 엘리베이터 씬 */
+
+.shaft {
+  background: #ffffff;
+  border-radius: var(--card-radius);
+  box-shadow: var(--shadow-soft);
+  padding: 26px 32px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.shaft-scene {
+  position: relative;
+  width: 360px;
+  height: 600px; /* 5층 * 110 + 여유 */
+  border-radius: 26px;
+  background: linear-gradient(180deg, #e5f0ff, #f9fafb);
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.22);
+  overflow: hidden;
+}
+
+/* 층 레이어 */
+
+.floor-layer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 110px;
+}
+
+.floor-line {
+  position: absolute;
+  left: 24px;
+  right: 24px;
+  bottom: 0;
+  height: 2px;
+  background: rgba(148, 163, 184, 0.5);
+}
+
+.floor-label-side {
+  position: absolute;
+  left: 26px;
+  bottom: 4px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #6b7280;
+}
+
+/* 대기 승객 – 네모 */
+
+.floor-waiting-side {
+  position: absolute;
+  right: 46px;
+  bottom: 8px;
+  display: flex;
+  gap: 6px;
+}
+
+.passenger-dot.waiting.side {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px; /* 네모 */
+  background: #f97316;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.18);
+}
+
+/* 샤프트 벽 */
+
+.shaft-wall {
+  position: absolute;
+  right: 140px;
+  bottom: 30px;                    /* 카드의 맨 아래에서 시작 */
+  height: calc(5 * 110px);      /* 4 * FLOOR_HEIGHT = 440px */
+  width: 4px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.24);
+}
+
+/* 엘리베이터 캐빈(측면) */
+
+.elevator-car.side {
+  position: absolute;
+  left: 15%;
+  width: 150px;
+  height: 90px;
+  border-radius: 18px;
+  /* 여기서 ease-in-out으로 가속/감속 느낌 */
+  transition: bottom 0.9s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.car-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 18px;
+  background: radial-gradient(circle at 10% 0%, #ecfeff, #dbeafe);
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.4);
+  overflow: hidden;
+}
+
+/* 문 – 직각, 중앙에서 양쪽으로 열림 */
+
+.car-door.side {
+  position: absolute;
+  inset: 8px 12px 8px 12px;
+  border-radius: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.door-panel {
+  position: absolute;
+  top: 0;
+  width: 50%;
+  height: 100%;
+  background: rgba(248, 250, 252, 0.97);
+  border-radius: 0;
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.4);
+  transition: transform 0.35s ease;
+}
+
+.door-panel.left {
+  left: 0;
+  transform: translateX(0);
+}
+
+.door-panel.right {
+  right: 0;
+  transform: translateX(0);
+}
+
+.car-door.side.door-opening .door-panel.left,
+.car-door.side.door-open .door-panel.left {
+  transform: translateX(-101%);
+}
+
+.car-door.side.door-opening .door-panel.right,
+.car-door.side.door-open .door-panel.right {
+  transform: translateX(101%);
+}
+
+.car-door.side.door-closing .door-panel.left,
+.car-door.side.door-closed .door-panel.left {
+  transform: translateX(0);
+}
+
+.car-door.side.door-closing .door-panel.right,
+.car-door.side.door-closed .door-panel.right {
+  transform: translateX(0);
+}
+
+/* 캐빈 안 승객 – 네모 */
+
+.car-people-inside {
+  position: absolute;
+  left: 18px;
+  bottom: 12px;
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.passenger-dot.inside {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  background: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.22);
+}
+
+/* 푸터 */
+
+.dash-footer {
+  margin-top: 24px;
+  font-size: 0.8rem;
+  color: #9ca3af;
+  text-align: center;
+}
+
+.unload-btn {
+  margin-left: 8px;
+  padding: 2px 8px;
+  font-size: 11px;
+  border-radius: 4px;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  cursor: pointer;
+}
+.unload-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* 끼임 승객(빨간 네모) */
+.passenger-dot.jammed {
+  background-color: #ef4444; /* 빨간색 */
+}
+
+/* 승객 리스트에서 끼임 승객 표시 */
+.passenger-item.jammed-item .passenger-route {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+/* 끼임 승객 생성 버튼 */
+.jam-section {
+  margin-top: 16px;
+  padding-top: 8px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.jam-btn {
+  padding: 6px 10px;
+  font-size: 12px;
+  border-radius: 6px;
+  border: 1px solid #ef4444;
+  background: #fef2f2;
+  color: #b91c1c;
+  cursor: pointer;
+}
+
+.jam-btn:hover {
+  background: #fee2e2;
+}
+
+.jam-hint {
+  margin-top: 6px;
+  font-size: 11px;
+  color: #6b7280;
+}
