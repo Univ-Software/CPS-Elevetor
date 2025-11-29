@@ -200,6 +200,75 @@ body {
   box-shadow: 0 8px 14px rgba(15, 23, 42, 0.08);
 }
 
+/* 외부 호출 패널 - 층별 방향 버튼 */
+
+.external-call-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  background: #f9fafb;
+  border-radius: 12px;
+}
+
+.external-call-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  background: #ffffff;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.floor-label-external {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #374151;
+  min-width: 35px;
+}
+
+.direction-buttons {
+  display: flex;
+  gap: 6px;
+}
+
+.direction-btn {
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.12s ease, transform 0.08s ease,
+    box-shadow 0.12s ease;
+}
+
+.direction-btn.up {
+  background: #dbeafe;
+  border-color: #93c5fd;
+  color: #1e40af;
+}
+
+.direction-btn.up:hover {
+  background: #bfdbfe;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(37, 99, 235, 0.15);
+}
+
+.direction-btn.down {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #b91c1c;
+}
+
+.direction-btn.down:hover {
+  background: #fecaca;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(220, 38, 38, 0.15);
+}
+
 /* 승객 폼/리스트 */
 
 .passenger-section {

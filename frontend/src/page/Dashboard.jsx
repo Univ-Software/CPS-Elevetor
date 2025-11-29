@@ -301,12 +301,27 @@ function Dashboard() {
   const requestFloor = (floor) => {
     if (!isConnected || !stompClientRef.current) return
 
-    // Send button press to backend
+    // Send car call (internal panel)
     stompClientRef.current.publish({
       destination: "/app/press-button",
       body: JSON.stringify({
         floor: floor,
         type: "CAR_CALL",
+      }),
+    })
+  }
+
+  // 외부 호출 패널용 - HALL_CALL with direction
+  const callElevatorExternal = (floor, direction) => {
+    if (!isConnected || !stompClientRef.current) return
+
+    // Send hall call (external panel)
+    stompClientRef.current.publish({
+      destination: "/app/press-button",
+      body: JSON.stringify({
+        floor: floor,
+        type: "HALL_CALL",
+        direction: direction,
       }),
     })
   }
@@ -773,15 +788,31 @@ function Dashboard() {
           <h2>외부 호출 / 승객</h2>
           <p className="panel-subtitle">각 층에서 엘리베이터 호출 + 승객 추가</p>
 
-          <div className="panel-buttons" style={{ marginBottom: 16 }}>
+          <div className="external-call-panel" style={{ marginBottom: 16 }}>
             {FLOORS.map((f) => (
-              <button
-                key={f}
-                className="floor-btn"
-                onClick={() => requestFloor(f)}
-              >
-                {f}층
-              </button>
+              <div key={f} className="external-call-row">
+                <span className="floor-label-external">{f}층</span>
+                <div className="direction-buttons">
+                  {f < 5 && (
+                    <button
+                      className="direction-btn up"
+                      onClick={() => callElevatorExternal(f, "UP")}
+                      title={`${f}층에서 상행 호출`}
+                    >
+                      ▲ 상행
+                    </button>
+                  )}
+                  {f > 1 && (
+                    <button
+                      className="direction-btn down"
+                      onClick={() => callElevatorExternal(f, "DOWN")}
+                      title={`${f}층에서 하행 호출`}
+                    >
+                      ▼ 하행
+                    </button>
+                  )}
+                </div>
+              </div>
             ))}
           </div>
 
