@@ -35,17 +35,22 @@ public class ElevatorSocketController {
     @MessageMapping("/status-report")
     @SendTo("/topic/control")
     public ControlCommand handleStatusReport(@Payload ElevatorStatus status) {
-        log.info("Received status report: Floor={}, Direction={}, Door={}, Obstructed={}, Passengers={}", 
+        log.info("Received status report: ElevatorId={}, Floor={}, yPx={}, Weight={}kg, Direction={}, Door={}, Obstructed={}", 
+                 status.getElevatorId(),
                  status.getCurrentFloor(), 
+                 status.getYPx(),
+                 status.getCurrentKg(),
                  status.getDirection(), 
                  status.getDoorStatus(),
-                 status.isObstructed(),
-                 status.getPassengerCount());
+                 status.isObstructed());
         
         // Process status through LOOK algorithm scheduler
         ControlCommand command = elevatorScheduler.processStatus(status);
         
-        log.info("Sending control command: {} - {}", command.getCommandType(), command.getMessage());
+        log.info("Sending control command: {} - {} (Scheduled Stops: {})", 
+                 command.getCommandType(), 
+                 command.getMessage(),
+                 command.getScheduledStops());
         
         return command;
     }
