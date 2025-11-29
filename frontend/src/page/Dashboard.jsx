@@ -1,5 +1,7 @@
 // src/pages/Dashboard.jsx
 import { useState, useEffect, useRef } from "react"
+import SockJS from "sockjs-client"
+import { Client } from "@stomp/stompjs"
 import "./Dashboard.css"
 
 const FLOORS = [5, 4, 3, 2, 1]
@@ -17,40 +19,8 @@ const DOOR_OPEN_TIME = 700
 const DOOR_CLOSE_TIME = 700
 const DOOR_DWELL_TIME = 2000
 
-// LOOK 기반 큐 재정렬 함수
-function buildQueueWithLook({ prevQueue, newFloors, currentFloor, direction }) {
-  const stopsSet = new Set(prevQueue)
-  newFloors.forEach((f) => {
-    if (f !== currentFloor) {
-      stopsSet.add(f)
-    }
-  })
-
-  const stops = Array.from(stopsSet)
-  if (stops.length === 0) return []
-
-  const above = stops.filter((f) => f > currentFloor).sort((a, b) => a - b)
-  const below = stops.filter((f) => f < currentFloor).sort((a, b) => b - a)
-  const here = stops.filter((f) => f === currentFloor)
-
-  if (direction === "up") {
-    return [...here, ...above, ...below]
-  } else if (direction === "down") {
-    return [...here, ...below, ...above]
-  } else {
-    if (above.length === 0) return [...here, ...below]
-    if (below.length === 0) return [...here, ...above]
-
-    const nearestUp = above[0] - currentFloor
-    const nearestDown = currentFloor - below[0]
-
-    if (nearestUp <= nearestDown) {
-      return [...here, ...above, ...below]
-    } else {
-      return [...here, ...below, ...above]
-    }
-  }
-}
+// Status reporting interval (ms)
+const STATUS_REPORT_INTERVAL = 100
 
 // 아래쪽(1층) 기준 인덱스: 1층→0, 2층→1, ... 5층→4
 function floorIndexFromBottom(floor) {
@@ -61,7 +31,10 @@ function floorIndexFromBottom(floor) {
 function Dashboard() {
   const [currentFloor, setCurrentFloor] = useState(1) // 논리 층
   const [carFloor, setCarFloor] = useState(1) // 화면 캐빈 층 (소수층 포함 가능)
-  const [queue, setQueue] = useState([])
+  
+  // Backend-driven scheduled stops (read-only display)
+  const [scheduledStops, setScheduledStops] = useState([])
+  
   const [direction, setDirection] = useState("idle")
   const [doorState, setDoorState] = useState("closed")
 
@@ -83,6 +56,15 @@ function Dashboard() {
     time: performance.now(),
   })
 
+  // WebSocket client
+  const stompClientRef = useRef(null)
+  const [isConnected, setIsConnected] = useState(false)
+  const [backendMessage, setBackendMessage] = useState("")
+
+  // 정위치 정차 실패 관련 상태
+  const [misalignMode, setMisalignMode] = useState(false)
+  const [isMisaligned, setIsMisaligned] = useState(false)
+
   const visiblePassengers = passengers.filter((p) => p.status !== "done")
   const doorLooksOpen = doorState === "open" || doorState === "opening"
 
@@ -95,15 +77,207 @@ function Dashboard() {
   const isOverload = onboardWeightKg > MAX_LOAD_KG
   const hasJammedOnboard = onboardPassengers.some((p) => p.isJammed)
 
-  // 정위치 정차 실패 관련 상태
-  const [misalignMode, setMisalignMode] = useState(false) // "다음 정차 시 실패" 플래그
-  const [isMisaligned, setIsMisaligned] = useState(false) // 현재 정위치 실패 상태 여부
-
-  // 화면상 이동 중인지: carFloor와 currentFloor가 다르면 이동 중으로 간주
+  // 화면상 이동 중인지
   const isMoving = carFloor !== currentFloor
 
   // -------------------------
-  // 실제 이동 속도 계산 (currentFloor 변경 시)
+  // WebSocket Connection Setup
+  // -------------------------
+  useEffect(() => {
+    const socket = new SockJS("/ws")
+    const client = new Client({
+      webSocketFactory: () => socket,
+      reconnectDelay: 5000,
+      heartbeatIncoming: 4000,
+      heartbeatOutgoing: 4000,
+      debug: (str) => {
+        console.log("[STOMP Debug]", str)
+      },
+      onConnect: () => {
+        console.log("WebSocket connected!")
+        setIsConnected(true)
+
+        // Subscribe to control commands from backend
+        client.subscribe("/topic/control", (message) => {
+          const command = JSON.parse(message.body)
+          console.log("Received command from backend:", command)
+          handleBackendCommand(command)
+        })
+
+        // Subscribe to button acknowledgments
+        client.subscribe("/topic/button-ack", (message) => {
+          const ack = JSON.parse(message.body)
+          console.log("Button press acknowledged:", ack)
+        })
+      },
+      onStompError: (frame) => {
+        console.error("STOMP error:", frame)
+        setIsConnected(false)
+      },
+      onWebSocketClose: () => {
+        console.log("WebSocket connection closed")
+        setIsConnected(false)
+      },
+    })
+
+    client.activate()
+    stompClientRef.current = client
+
+    return () => {
+      if (client.active) {
+        client.deactivate()
+      }
+    }
+  }, [])
+
+  // -------------------------
+  // Handle Backend Commands
+  // -------------------------
+  const handleBackendCommand = (command) => {
+    const { commandType, message, scheduledStops: stops } = command
+
+    setBackendMessage(message || "")
+    setScheduledStops(stops || [])
+
+    switch (commandType) {
+      case "MOTOR_UP":
+        if (doorState === "closed" && !isMoving) {
+          setDirection("up")
+          // Calculate target floor from scheduledStops
+          if (stops && stops.length > 0) {
+            const target = stops[0]
+            const distanceFloors = Math.abs(target - currentFloor)
+            const travelTime = TIME_PER_FLOOR * distanceFloors
+
+            // Apply misalignment if mode is active
+            let visualTargetFloor = target
+            if (misalignMode && !isMisaligned) {
+              const OFFSET_RANGE = 0.4
+              const offset = (Math.random() * 2 - 1) * OFFSET_RANGE
+              let misFloor = target + offset
+              if (misFloor < 1) misFloor = 1
+              if (misFloor > 5) misFloor = 5
+              visualTargetFloor = misFloor
+              setIsMisaligned(true)
+            }
+
+            setMoveDuration(travelTime)
+            setCarFloor(visualTargetFloor)
+            moveRef.current = { floor: currentFloor, time: performance.now() }
+
+            setTimeout(() => {
+              setCurrentFloor(target)
+              if (misalignMode) {
+                setMisalignMode(false)
+              }
+            }, travelTime)
+          }
+        }
+        break
+
+      case "MOTOR_DOWN":
+        if (doorState === "closed" && !isMoving) {
+          setDirection("down")
+          if (stops && stops.length > 0) {
+            const target = stops[0]
+            const distanceFloors = Math.abs(target - currentFloor)
+            const travelTime = TIME_PER_FLOOR * distanceFloors
+
+            // Apply misalignment if mode is active
+            let visualTargetFloor = target
+            if (misalignMode && !isMisaligned) {
+              const OFFSET_RANGE = 0.4
+              const offset = (Math.random() * 2 - 1) * OFFSET_RANGE
+              let misFloor = target + offset
+              if (misFloor < 1) misFloor = 1
+              if (misFloor > 5) misFloor = 5
+              visualTargetFloor = misFloor
+              setIsMisaligned(true)
+            }
+
+            setMoveDuration(travelTime)
+            setCarFloor(visualTargetFloor)
+            moveRef.current = { floor: currentFloor, time: performance.now() }
+
+            setTimeout(() => {
+              setCurrentFloor(target)
+              if (misalignMode) {
+                setMisalignMode(false)
+              }
+            }, travelTime)
+          }
+        }
+        break
+
+      case "STOP":
+        setDirection("idle")
+        // Snap to current floor if not already
+        if (carFloor !== currentFloor) {
+          setCarFloor(currentFloor)
+        }
+        break
+
+      case "OPEN":
+        if (doorState === "closed" && !isMoving && !isMisaligned) {
+          setDoorState("opening")
+        }
+        break
+
+      case "CLOSE":
+        if (doorState === "open" && !isOverload) {
+          setDoorState("closing")
+        }
+        break
+
+      case "WAIT":
+        // Do nothing, just wait
+        break
+
+      default:
+        console.warn("Unknown command type:", commandType)
+    }
+  }
+
+  // -------------------------
+  // Send Status Report to Backend
+  // -------------------------
+  useEffect(() => {
+    if (!isConnected || !stompClientRef.current) return
+
+    const intervalId = setInterval(() => {
+      // Calculate yPx based on carFloor
+      const currentIndex = floorIndexFromBottom(carFloor)
+      const yPx = currentIndex * FLOOR_HEIGHT + FLOOR_BASE_OFFSET + 10
+
+      const status = {
+        elevatorId: "E1",
+        currentFloor: currentFloor,
+        yPx: yPx,
+        currentKg: onboardWeightKg,
+        doorStatus: doorState.toUpperCase(),
+        isObstructed: hasJammedOnboard,
+        direction: direction.toUpperCase(),
+      }
+
+      stompClientRef.current.publish({
+        destination: "/app/status-report",
+        body: JSON.stringify(status),
+      })
+    }, STATUS_REPORT_INTERVAL)
+
+    return () => clearInterval(intervalId)
+  }, [
+    isConnected,
+    currentFloor,
+    carFloor,
+    onboardWeightKg,
+    doorState,
+    hasJammedOnboard,
+    direction,
+  ])
+
+  // -------------------------
+  // 실제 이동 속도 계산
   // -------------------------
   useEffect(() => {
     const now = performance.now()
@@ -114,25 +288,26 @@ function Dashboard() {
     if (dtSec > 0 && dfloor > 0) {
       const speed = dfloor / dtSec
       setSpeedFloorsPerSec(speed)
-    } else if (queue.length === 0 || doorState !== "closed") {
+    } else if (scheduledStops.length === 0 || doorState !== "closed") {
       setSpeedFloorsPerSec(0)
     }
 
     moveRef.current = { floor: currentFloor, time: now }
-  }, [currentFloor, queue.length, doorState])
+  }, [currentFloor, scheduledStops.length, doorState])
 
   // -------------------------
-  // 층 호출 / 승객 추가 (일반 승객)
+  // 층 호출 / 승객 추가 (Button Press → Backend)
   // -------------------------
   const requestFloor = (floor) => {
-    setQueue((prev) => {
-      if (prev.includes(floor) || floor === currentFloor) return prev
-      return buildQueueWithLook({
-        prevQueue: prev,
-        newFloors: [floor],
-        currentFloor,
-        direction,
-      })
+    if (!isConnected || !stompClientRef.current) return
+
+    // Send button press to backend
+    stompClientRef.current.publish({
+      destination: "/app/press-button",
+      body: JSON.stringify({
+        floor: floor,
+        type: "CAR_CALL",
+      }),
     })
   }
 
@@ -143,7 +318,6 @@ function Dashboard() {
       return
     }
 
-    // 20 ~ 110kg 랜덤 정수
     const weightKg =
       Math.floor(Math.random() * (MAX_WEIGHT_KG - MIN_WEIGHT_KG + 1)) +
       MIN_WEIGHT_KG
@@ -160,8 +334,16 @@ function Dashboard() {
     setPassengers((prev) => [...prev, newPassenger])
     setNextPassengerId((id) => id + 1)
 
-    if (spawnFloor === currentFloor && doorState === "closed" && !isMoving) {
-      setDoorState("opening")
+    // Send hall call to backend
+    if (isConnected && stompClientRef.current) {
+      stompClientRef.current.publish({
+        destination: "/app/press-button",
+        body: JSON.stringify({
+          floor: spawnFloor,
+          type: "HALL_CALL",
+          direction: targetFloor > spawnFloor ? "UP" : "DOWN",
+        }),
+      })
     }
   }
 
@@ -188,25 +370,32 @@ function Dashboard() {
     setPassengers((prev) => [...prev, newPassenger])
     setNextPassengerId((id) => id + 1)
 
-    if (from === currentFloor && doorState === "closed" && !isMoving) {
-      setDoorState("opening")
+    // Send hall call
+    if (isConnected && stompClientRef.current) {
+      stompClientRef.current.publish({
+        destination: "/app/press-button",
+        body: JSON.stringify({
+          floor: from,
+          type: "HALL_CALL",
+          direction: to > from ? "UP" : "DOWN",
+        }),
+      })
     }
   }
 
   // -------------------------
-  // 정위치 정차 실패 모드 ON (다음 정차에서 발동)
+  // 정위치 정차 실패 모드 ON
   // -------------------------
   const handleStartMisalignTest = () => {
     if (isMisaligned) {
       alert("이미 정위치 정차 실패 상태입니다. 먼저 정위치 자동 수정을 해주세요.")
       return
     }
-    // 그냥 플래그만 켜두면, 다음 이동에서 한 번만 사용됨
     setMisalignMode(true)
   }
 
   // -------------------------
-  // 승객 강제 하차 (문 열려 있을 때만)
+  // 승객 강제 하차
   // -------------------------
   const handleUnloadPassenger = (id) => {
     if (!doorLooksOpen) {
@@ -217,9 +406,6 @@ function Dashboard() {
     const passengerToUnload = passengers.find((p) => p.id === id)
     if (!passengerToUnload || passengerToUnload.status !== "onboard") return
 
-    const destFloor = passengerToUnload.to
-
-    // 승객 상태: onboard → done (내린 층을 현재 층으로 기록)
     setPassengers((prev) =>
       prev.map((p) =>
         p.id === id && p.status === "onboard"
@@ -227,21 +413,6 @@ function Dashboard() {
           : p
       )
     )
-
-    // 이 승객이 가려던 목적층에 더 이상 아무도 안 가면 큐에서도 제거
-    setQueue((prevQueue) => {
-      if (!destFloor || !prevQueue.includes(destFloor)) return prevQueue
-
-      const stillGoing = passengers.some(
-        (p) =>
-          p.id !== id &&
-          p.status !== "done" &&
-          p.to === destFloor
-      )
-
-      if (stillGoing) return prevQueue
-      return prevQueue.filter((f) => f !== destFloor)
-    })
   }
 
   // -------------------------
@@ -249,14 +420,13 @@ function Dashboard() {
   // -------------------------
   const handleDoorOpenButton = () => {
     if (doorState === "open" || doorState === "opening") return
-    if (isMoving) return // 이동 중에는 열기 금지
+    if (isMoving) return
     setDoorState("opening")
   }
 
   const handleDoorCloseButton = () => {
     if (doorState === "closed" || doorState === "closing") return
 
-    // 과부하 상태에서는 문 닫기 금지
     if (isOverload) {
       alert("적재량 500kg을 초과하여 문을 닫을 수 없습니다. 승객을 내려주세요.")
       return
@@ -266,96 +436,7 @@ function Dashboard() {
   }
 
   // -------------------------
-  // 엘리베이터 이동 로직 (연속 이동)
-  // - queue[0]까지 한 번에 쭉 이동
-  // - 이동 시간 = 층 수 × TIME_PER_FLOOR
-  // - misalignMode가 켜져 있으면, 목적층 근처의 랜덤 소수층으로 정차
-  // -------------------------
-  useEffect(() => {
-    // 문이 열려 있으면 이동 금지
-    if (doorState !== "closed") {
-      setDirection("idle")
-      return
-    }
-
-    // 처리할 큐가 없으면 정지
-    if (queue.length === 0) {
-      setDirection("idle")
-      return
-    }
-
-    // 이미 애니메이션 이동 중이면 다음 step 기다리기
-    if (isMoving) return
-
-    const target = queue[0]
-
-    // 이미 그 층에 논리적으로 도착해 있으면
-    if (target === currentFloor) {
-      setDirection("idle")
-      return
-    }
-
-    const distanceFloors = Math.abs(target - currentFloor)
-    const travelTime = TIME_PER_FLOOR * distanceFloors
-
-    setMoveDuration(travelTime)
-    setDirection(target > currentFloor ? "up" : "down")
-
-    // ---- 정위치 실패 모드 적용 ----
-    let visualTargetFloor = target
-    if (misalignMode && !isMisaligned) {
-      // target 층 근처에서 ±0.4층 정도 랜덤 오프셋
-      const OFFSET_RANGE = 0.4
-      const offset = (Math.random() * 2 - 1) * OFFSET_RANGE // -0.4 ~ +0.4
-      let misFloor = target + offset
-      // 1층 ~ 5층 범위 안으로만 클램프
-      if (misFloor < 1) misFloor = 1
-      if (misFloor > 5) misFloor = 5
-
-      visualTargetFloor = misFloor
-      setIsMisaligned(true)
-    }
-
-    // 화면용 캐빈 위치를 "목표(또는 오프셋된) 층"으로 설정
-    setCarFloor(visualTargetFloor)
-
-    // 이 시점 기준으로 실제 속도 측정에 사용할 시간 저장
-    moveRef.current = { floor: currentFloor, time: performance.now() }
-
-    // travelTime 뒤에 논리 층을 한 번에 target으로 갱신
-    const id = setTimeout(() => {
-      setCurrentFloor(target)
-      // 한 번 발동 후에는 모드 해제 (다음 정차는 다시 정상)
-      if (misalignMode) {
-        setMisalignMode(false)
-      }
-    }, travelTime)
-
-    return () => {
-      void id
-    }
-  }, [queue, currentFloor, doorState, isMoving, misalignMode, isMisaligned])
-
-  // -------------------------
-  // 도착 후 멈춘 상태에서만 문 자동 열기
-  //  - isMisaligned 상태에서는 문이 자동으로 열리지 않음
-  // -------------------------
-  useEffect(() => {
-    if (doorState !== "closed") return
-    if (queue.length === 0) return
-    if (isMoving) return
-    if (isMisaligned) return // 정위치 실패 상태에서는 문 자동 오픈 금지
-
-    const target = queue[0]
-    if (target === currentFloor && carFloor === currentFloor) {
-      setDoorState("opening")
-    }
-  }, [doorState, queue, currentFloor, carFloor, isMoving, isMisaligned])
-
-  // -------------------------
-  // 문 상태 타이밍 (opening → open → closing → closed)
-  //  + 끼임 승객 로직:
-  //    - closing 상태에서 끼임 승객이 onboard면 "closed"로 가지 않고 계속 closing 유지
+  // 문 상태 타이밍
   // -------------------------
   useEffect(() => {
     let timerId
@@ -365,7 +446,6 @@ function Dashboard() {
         setDoorState("open")
       }, DOOR_OPEN_TIME)
     } else if (doorState === "open") {
-      // 과부하 상태에서는 자동으로 닫히지 않음
       if (!isOverload) {
         timerId = setTimeout(() => {
           setDoorState("closing")
@@ -374,23 +454,18 @@ function Dashboard() {
     } else if (doorState === "closing") {
       if (hasJammedOnboard) {
         // 끼임 승객이 탑승 중이면 문이 끝까지 닫히지 않음
-        // -> "닫히는 중" 상태를 유지
       } else {
         timerId = setTimeout(() => {
           setDoorState("closed")
-          // 한 층 서비스 완료되었으면 큐에서 제거
-          setQueue((prev) =>
-            prev.length > 0 && prev[0] === currentFloor ? prev.slice(1) : prev
-          )
         }, DOOR_CLOSE_TIME)
       }
     }
 
     return () => clearTimeout(timerId)
-  }, [doorState, currentFloor, isOverload, hasJammedOnboard])
+  }, [doorState, isOverload, hasJammedOnboard])
 
   // -------------------------
-  // 문이 "완전히 열린 순간" 탑승/하차
+  // 문이 열린 순간 탑승/하차
   // -------------------------
   useEffect(() => {
     if (doorState !== "open") return
@@ -410,25 +485,25 @@ function Dashboard() {
         return p
       })
 
-      if (boardingTargets.length > 0) {
-        setQueue((prevQ) =>
-          buildQueueWithLook({
-            prevQueue: prevQ,
-            newFloors: boardingTargets,
-            currentFloor,
-            direction,
+      // Send car calls for passengers who just boarded
+      if (boardingTargets.length > 0 && isConnected && stompClientRef.current) {
+        boardingTargets.forEach((targetFloor) => {
+          stompClientRef.current.publish({
+            destination: "/app/press-button",
+            body: JSON.stringify({
+              floor: targetFloor,
+              type: "CAR_CALL",
+            }),
           })
-        )
+        })
       }
 
       return updated
     })
-  }, [doorState, currentFloor, direction])
+  }, [doorState, currentFloor, isConnected])
 
   // -------------------------
   // 정위치 자동 수정
-  // - 현재 carFloor(소수층)를 가장 가까운 정수 층으로 이동
-  // - 이동 후 currentFloor를 그 층으로 맞추고 isMisaligned 해제
   // -------------------------
   const handleFixMisalign = () => {
     if (!isMisaligned) {
@@ -436,16 +511,13 @@ function Dashboard() {
       return
     }
 
-    // 가장 가까운 정수 층 (1~5 사이로 클램프)
     let nearestFloor = Math.round(carFloor)
     if (nearestFloor < 1) nearestFloor = 1
     if (nearestFloor > 5) nearestFloor = 5
 
     const distanceFloors = Math.abs(nearestFloor - carFloor)
-    // 정위치 오차는 작다고 가정하므로 distanceFloors는 보통 0.x
     const travelTime = TIME_PER_FLOOR * distanceFloors
 
-    // 0인 경우(이미 딱 층에 맞아 있는 경우) 바로 해제
     if (travelTime === 0) {
       setCarFloor(nearestFloor)
       setCurrentFloor(nearestFloor)
@@ -462,12 +534,11 @@ function Dashboard() {
     setTimeout(() => {
       setCurrentFloor(nearestFloor)
       setIsMisaligned(false)
-      // 이후 자동 문 열림 useEffect가 조건을 만족하면 문을 열어 줌
     }, travelTime)
   }
 
   // -------------------------
-  // 엘리베이터 위치 계산 (시각용은 carFloor 사용)
+  // 엘리베이터 위치 계산
   // -------------------------
   const currentIndex = floorIndexFromBottom(carFloor)
   const rawBottom = currentIndex * FLOOR_HEIGHT + FLOOR_BASE_OFFSET + 10
@@ -497,7 +568,10 @@ function Dashboard() {
               <span style={{ color: statusColor }}>({statusLabel})</span>
             </p>
             <p className="queue-info">
-              대기 큐: {queue.length === 0 ? "없음" : queue.join(" → ")}
+              예정 경로 (Backend): {scheduledStops.length === 0 ? "없음" : scheduledStops.join(" → ")}
+            </p>
+            <p className="backend-message">
+              Backend: {isConnected ? "🟢 연결됨" : "🔴 연결 끊김"} | {backendMessage}
             </p>
 
             {/* 무게 기반 적재 표시 */}
