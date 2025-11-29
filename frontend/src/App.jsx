@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react"
 import SockJS from "sockjs-client"
 import { Client } from "@stomp/stompjs"
-import "./Dashboard.css"
+import "./page/Dashboard.css"
 
 const FLOORS = [5, 4, 3, 2, 1]
 const FLOOR_HEIGHT = 110 // 층 간 간격(px) – CSS와 맞춰 사용
