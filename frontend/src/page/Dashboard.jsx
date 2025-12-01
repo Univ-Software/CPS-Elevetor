@@ -201,7 +201,6 @@ function Dashboard() {
       alert("이미 정위치 정차 실패 상태입니다. 먼저 정위치 자동 수정을 해주세요.")
       return
     }
-    // 그냥 플래그만 켜두면, 다음 이동에서 한 번만 사용됨
     setMisalignMode(true)
   }
 
@@ -219,7 +218,6 @@ function Dashboard() {
 
     const destFloor = passengerToUnload.to
 
-    // 승객 상태: onboard → done (내린 층을 현재 층으로 기록)
     setPassengers((prev) =>
       prev.map((p) =>
         p.id === id && p.status === "onboard"
@@ -228,7 +226,6 @@ function Dashboard() {
       )
     )
 
-    // 이 승객이 가려던 목적층에 더 이상 아무도 안 가면 큐에서도 제거
     setQueue((prevQueue) => {
       if (!destFloor || !prevQueue.includes(destFloor)) return prevQueue
 
@@ -249,14 +246,13 @@ function Dashboard() {
   // -------------------------
   const handleDoorOpenButton = () => {
     if (doorState === "open" || doorState === "opening") return
-    if (isMoving) return // 이동 중에는 열기 금지
+    if (isMoving) return
     setDoorState("opening")
   }
 
   const handleDoorCloseButton = () => {
     if (doorState === "closed" || doorState === "closing") return
 
-    // 과부하 상태에서는 문 닫기 금지
     if (isOverload) {
       alert("적재량 500kg을 초과하여 문을 닫을 수 없습니다. 승객을 내려주세요.")
       return
@@ -266,30 +262,23 @@ function Dashboard() {
   }
 
   // -------------------------
-  // 엘리베이터 이동 로직 (연속 이동)
-  // - queue[0]까지 한 번에 쭉 이동
-  // - 이동 시간 = 층 수 × TIME_PER_FLOOR
-  // - misalignMode가 켜져 있으면, 목적층 근처의 랜덤 소수층으로 정차
+  // 엘리베이터 이동 로직
   // -------------------------
   useEffect(() => {
-    // 문이 열려 있으면 이동 금지
     if (doorState !== "closed") {
       setDirection("idle")
       return
     }
 
-    // 처리할 큐가 없으면 정지
     if (queue.length === 0) {
       setDirection("idle")
       return
     }
 
-    // 이미 애니메이션 이동 중이면 다음 step 기다리기
     if (isMoving) return
 
     const target = queue[0]
 
-    // 이미 그 층에 논리적으로 도착해 있으면
     if (target === currentFloor) {
       setDirection("idle")
       return
@@ -304,11 +293,9 @@ function Dashboard() {
     // ---- 정위치 실패 모드 적용 ----
     let visualTargetFloor = target
     if (misalignMode && !isMisaligned) {
-      // target 층 근처에서 ±0.4층 정도 랜덤 오프셋
       const OFFSET_RANGE = 0.4
       const offset = (Math.random() * 2 - 1) * OFFSET_RANGE // -0.4 ~ +0.4
       let misFloor = target + offset
-      // 1층 ~ 5층 범위 안으로만 클램프
       if (misFloor < 1) misFloor = 1
       if (misFloor > 5) misFloor = 5
 
@@ -316,16 +303,12 @@ function Dashboard() {
       setIsMisaligned(true)
     }
 
-    // 화면용 캐빈 위치를 "목표(또는 오프셋된) 층"으로 설정
     setCarFloor(visualTargetFloor)
 
-    // 이 시점 기준으로 실제 속도 측정에 사용할 시간 저장
     moveRef.current = { floor: currentFloor, time: performance.now() }
 
-    // travelTime 뒤에 논리 층을 한 번에 target으로 갱신
     const id = setTimeout(() => {
       setCurrentFloor(target)
-      // 한 번 발동 후에는 모드 해제 (다음 정차는 다시 정상)
       if (misalignMode) {
         setMisalignMode(false)
       }
@@ -337,14 +320,13 @@ function Dashboard() {
   }, [queue, currentFloor, doorState, isMoving, misalignMode, isMisaligned])
 
   // -------------------------
-  // 도착 후 멈춘 상태에서만 문 자동 열기
-  //  - isMisaligned 상태에서는 문이 자동으로 열리지 않음
+  // 도착 후 멈춘 상태에서만 문 자동 열기 (정위치 실패 시 자동 오픈 X)
   // -------------------------
   useEffect(() => {
     if (doorState !== "closed") return
     if (queue.length === 0) return
     if (isMoving) return
-    if (isMisaligned) return // 정위치 실패 상태에서는 문 자동 오픈 금지
+    if (isMisaligned) return
 
     const target = queue[0]
     if (target === currentFloor && carFloor === currentFloor) {
@@ -353,9 +335,7 @@ function Dashboard() {
   }, [doorState, queue, currentFloor, carFloor, isMoving, isMisaligned])
 
   // -------------------------
-  // 문 상태 타이밍 (opening → open → closing → closed)
-  //  + 끼임 승객 로직:
-  //    - closing 상태에서 끼임 승객이 onboard면 "closed"로 가지 않고 계속 closing 유지
+  // 문 상태 타이밍 + 끼임 로직
   // -------------------------
   useEffect(() => {
     let timerId
@@ -365,7 +345,6 @@ function Dashboard() {
         setDoorState("open")
       }, DOOR_OPEN_TIME)
     } else if (doorState === "open") {
-      // 과부하 상태에서는 자동으로 닫히지 않음
       if (!isOverload) {
         timerId = setTimeout(() => {
           setDoorState("closing")
@@ -373,12 +352,10 @@ function Dashboard() {
       }
     } else if (doorState === "closing") {
       if (hasJammedOnboard) {
-        // 끼임 승객이 탑승 중이면 문이 끝까지 닫히지 않음
-        // -> "닫히는 중" 상태를 유지
+        // 끼임 승객이 탑승 중이면 "닫히는 중" 상태 유지
       } else {
         timerId = setTimeout(() => {
           setDoorState("closed")
-          // 한 층 서비스 완료되었으면 큐에서 제거
           setQueue((prev) =>
             prev.length > 0 && prev[0] === currentFloor ? prev.slice(1) : prev
           )
@@ -427,8 +404,6 @@ function Dashboard() {
 
   // -------------------------
   // 정위치 자동 수정
-  // - 현재 carFloor(소수층)를 가장 가까운 정수 층으로 이동
-  // - 이동 후 currentFloor를 그 층으로 맞추고 isMisaligned 해제
   // -------------------------
   const handleFixMisalign = () => {
     if (!isMisaligned) {
@@ -436,16 +411,13 @@ function Dashboard() {
       return
     }
 
-    // 가장 가까운 정수 층 (1~5 사이로 클램프)
     let nearestFloor = Math.round(carFloor)
     if (nearestFloor < 1) nearestFloor = 1
     if (nearestFloor > 5) nearestFloor = 5
 
     const distanceFloors = Math.abs(nearestFloor - carFloor)
-    // 정위치 오차는 작다고 가정하므로 distanceFloors는 보통 0.x
     const travelTime = TIME_PER_FLOOR * distanceFloors
 
-    // 0인 경우(이미 딱 층에 맞아 있는 경우) 바로 해제
     if (travelTime === 0) {
       setCarFloor(nearestFloor)
       setCurrentFloor(nearestFloor)
@@ -462,7 +434,6 @@ function Dashboard() {
     setTimeout(() => {
       setCurrentFloor(nearestFloor)
       setIsMisaligned(false)
-      // 이후 자동 문 열림 useEffect가 조건을 만족하면 문을 열어 줌
     }, travelTime)
   }
 
@@ -500,7 +471,6 @@ function Dashboard() {
               대기 큐: {queue.length === 0 ? "없음" : queue.join(" → ")}
             </p>
 
-            {/* 무게 기반 적재 표시 */}
             <p className="capacity-info">
               정격 적재 {MAX_LOAD_KG}kg ·{" "}
               <span className={`capacity-count ${isOverload ? "full" : ""}`}>
@@ -610,9 +580,8 @@ function Dashboard() {
             </button>
             <p className="level-hint">
               정위치 실패 모드를 켜면 다음 목표 층에서 1~5층 사이 랜덤 위치에
-              정차하고, 문이 열리지 않습니다.{" "}
-              &quot;정위치 자동 수정&quot;을 누르면 가장 가까운 층으로 이동한 뒤
-              정상 동작합니다.
+              정차하고, 문이 열리지 않습니다. "정위치 자동 수정"을 누르면 가장
+              가까운 층으로 이동한 뒤 정상 동작합니다.
             </p>
           </div>
         </div>
@@ -620,7 +589,6 @@ function Dashboard() {
         {/* 가운데: 측면 엘리베이터 장면 */}
         <div className="shaft">
           <div className="shaft-scene">
-            {/* 층 라인 + 대기 승객 */}
             {FLOORS.map((f) => {
               const idx = floorIndexFromBottom(f)
               const bottom = idx * FLOOR_HEIGHT + FLOOR_BASE_OFFSET
@@ -654,10 +622,8 @@ function Dashboard() {
               )
             })}
 
-            {/* 중앙 세로 샤프트 라인 */}
             <div className="shaft-wall" />
 
-            {/* 엘리베이터 캐빈 */}
             <div
               className={`elevator-car side ${
                 doorLooksOpen ? "open" : "closed"
@@ -668,20 +634,17 @@ function Dashboard() {
               }}
             >
               <div className="car-inner">
-                {/* 문 – 직각 슬라이딩 */}
                 <div className={`car-door side door-${doorState}`}>
                   <div className="door-panel left" />
                   <div className="door-panel right" />
                 </div>
 
-                {/* 캐빈 안 승객 (네모) */}
                 <div className="car-people-inside">
                   {onboardPassengers.map((p) => (
                     <div
                       key={p.id}
                       className={
-                        "passenger-dot inside" +
-                        (p.isJammed ? " jammed" : "")
+                        "passenger-dot inside" + (p.isJammed ? " jammed" : "")
                       }
                       title={`${p.from}층 → ${p.to}층 (${p.weightKg}kg)${
                         p.isJammed ? " / 끼임 승객" : ""
@@ -788,6 +751,92 @@ function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* ▼ 백엔드 연동 섹션 (하단 가로 전체) */}
+      <section className="backend-panel">
+        <div className="backend-inner">
+          <div className="backend-header">
+            <h2>백엔드 연동 · 센서 데이터 모니터링</h2>
+            <p className="backend-subtitle">
+              엘리베이터 상태를 백엔드와 주고받는 영역입니다. 아래 행렬/테이블은
+              나중에 API 응답 값으로 채울 예정입니다.
+            </p>
+          </div>
+
+          <div className="backend-grid">
+            {/* 왼쪽: 현재 센서/상태 요약 (행렬 형태로 쓸 자리) */}
+            <div className="backend-card">
+              <h3>실시간 센서 값 (예시)</h3>
+              <table className="backend-table">
+                <thead>
+                  <tr>
+                    <th>항목</th>
+                    <th>값</th>
+                    <th>단위</th>
+                    <th>상태</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>현재 층</td>
+                    <td>{currentFloor}</td>
+                    <td>층</td>
+                    <td>-</td>
+                  </tr>
+                  <tr>
+                    <td>카 위치</td>
+                    <td>{carBottom.toFixed(1)}</td>
+                    <td>px</td>
+                    <td>{isMisaligned ? "정위치 실패" : "정상"}</td>
+                  </tr>
+                  <tr>
+                    <td>속도</td>
+                    <td>{speedFloorsPerSec.toFixed(2)}</td>
+                    <td>층/초</td>
+                    <td>{isMoving ? "이동 중" : "정지"}</td>
+                  </tr>
+                  <tr>
+                    <td>문 상태</td>
+                    <td>{doorState}</td>
+                    <td>-</td>
+                    <td>{hasJammedOnboard ? "끼임 감지" : "정상"}</td>
+                  </tr>
+                  <tr>
+                    <td>적재량</td>
+                    <td>{onboardWeightKg}</td>
+                    <td>kg</td>
+                    <td>{isOverload ? "과부하" : "정상"}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* 오른쪽: 백엔드 응답 / 이벤트 로그 자리 */}
+            <div className="backend-card backend-log">
+              <h3>백엔드 이벤트 / 알람 로그</h3>
+              <p className="backend-log-hint">
+                여기에는 추후 백엔드에서 내려주는{" "}
+                <code>위험도 행렬</code>, <code>알람 리스트</code>,
+                <code>제어 명령 이력</code> 등을 표시할 예정입니다.
+                지금은 레이아웃만 잡혀 있으며, 실제 데이터는 API 연동 후
+                채워넣으면 됩니다.
+              </p>
+
+              <div className="backend-log-list">
+                <div className="backend-log-item placeholder">
+                  예) [WARN] 3층 · 과부하 감지 (520kg)
+                </div>
+                <div className="backend-log-item placeholder">
+                  예) [INFO] 정위치 자동 수정 완료 (4F)
+                </div>
+                <div className="backend-log-item placeholder">
+                  예) [ALERT] 문 끼임 감지 · 즉시 정지
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <footer className="dash-footer">© 2025 CPS Elevator System</footer>
     </div>
