@@ -29,9 +29,16 @@ body {
   flex-direction: column;
 }
 
+<<<<<<< HEAD
 /* =========================================
    헤더 영역
    ========================================= */
+=======
+/* ===========================
+   헤더
+   =========================== */
+
+>>>>>>> 72094960a3df44080e7a925352d2bff5007d8ed3
 .dash-header {
   margin-bottom: 24px;
 }
@@ -69,7 +76,14 @@ body {
   color: var(--muted);
 }
 
+<<<<<<< HEAD
 /* 문 상태 컨트롤 */
+=======
+/* ===========================
+   문 상태
+   =========================== */
+
+>>>>>>> 72094960a3df44080e7a925352d2bff5007d8ed3
 .door-controls {
   display: flex;
   flex-direction: column;
@@ -143,17 +157,34 @@ body {
   filter: brightness(0.95);
 }
 
+<<<<<<< HEAD
 /* =========================================
    메인 레이아웃 (3단 분할)
    ========================================= */
+=======
+/* ===========================
+   메인 3분할 레이아웃
+   =========================== */
+
+>>>>>>> 72094960a3df44080e7a925352d2bff5007d8ed3
 .dash-layout {
   display: grid;
+<<<<<<< HEAD
   grid-template-columns: 300px minmax(400px, 1fr) 300px;
   gap: 24px;
   align-items: start;
 }
 
 /* 패널 공통 스타일 */
+=======
+  grid-template-columns: 320px minmax(420px, 1.4fr) 320px;
+  gap: 32px;
+  margin-bottom: 36px; /* 아래 백엔드 카드와 간격 */
+}
+
+/* 카드 공통 */
+
+>>>>>>> 72094960a3df44080e7a925352d2bff5007d8ed3
 .panel {
   background: #ffffff;
   border-radius: var(--card-radius);
@@ -172,7 +203,12 @@ body {
   padding-bottom: 12px;
 }
 
+<<<<<<< HEAD
 /* 버튼 그리드 */
+=======
+/* 패널 버튼들 */
+
+>>>>>>> 72094960a3df44080e7a925352d2bff5007d8ed3
 .panel-buttons {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
@@ -200,6 +236,27 @@ body {
 .floor-btn:hover {
   background: #e2e8f0;
   transform: translateY(-1px);
+<<<<<<< HEAD
+=======
+  box-shadow: 0 8px 14px rgba(15, 23, 42, 0.08);
+}
+
+/* ===========================
+   승객 폼/리스트
+   =========================== */
+
+.passenger-section {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.passenger-section h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: #111827;
+>>>>>>> 72094960a3df44080e7a925352d2bff5007d8ed3
 }
 
 /* =========================================
@@ -284,9 +341,31 @@ body {
   cursor: pointer;
 }
 
+<<<<<<< HEAD
 /* =========================================
    샤프트 & 엘리베이터 (중앙)
    ========================================= */
+=======
+.passenger-status.waiting {
+  background: rgba(251, 191, 36, 0.18);
+  color: #92400e;
+}
+
+.passenger-status.onboard {
+  background: rgba(22, 163, 74, 0.18);
+  color: #166534;
+}
+
+.passenger-status.done {
+  background: rgba(148, 163, 184, 0.25);
+  color: #4b5563;
+}
+
+/* ===========================
+   중앙 엘리베이터 씬
+   =========================== */
+
+>>>>>>> 72094960a3df44080e7a925352d2bff5007d8ed3
 .shaft {
   background: #ffffff;
   border-radius: var(--card-radius);
@@ -323,11 +402,29 @@ body {
   color: #cbd5e1;
 }
 
+<<<<<<< HEAD
 .shaft-wall {
   position: absolute;
   right: 120px;
   top: 20px;
   bottom: 20px;
+=======
+.passenger-dot.waiting.side {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: #f97316;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.18);
+}
+
+/* 샤프트 벽 */
+
+.shaft-wall {
+  position: absolute;
+  right: 140px;
+  bottom: 30px;
+  height: calc(5 * 110px);
+>>>>>>> 72094960a3df44080e7a925352d2bff5007d8ed3
   width: 4px;
   background: rgba(0,0,0,0.1);
   border-radius: 4px;
@@ -341,10 +438,15 @@ body {
   transform: translateX(-50%); /* 중앙 정렬 */
   width: 140px;
   height: 90px;
+<<<<<<< HEAD
   border-radius: 12px;
   /* 부드러운 이동 애니메이션 */
   transition: bottom 0.5s cubic-bezier(0.45, 0, 0.55, 1);
   z-index: 10;
+=======
+  border-radius: 18px;
+  transition: bottom 0.9s cubic-bezier(0.4, 0, 0.2, 1);
+>>>>>>> 72094960a3df44080e7a925352d2bff5007d8ed3
 }
 
 .car-inner {
@@ -402,12 +504,32 @@ body {
   z-index: 5;
 }
 
+<<<<<<< HEAD
 .passenger-dot {
   width: 12px;
   height: 12px;
+=======
+.passenger-dot.inside {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  background: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.22);
+}
+
+/* ===========================
+   공통 버튼/푸터
+   =========================== */
+
+.unload-btn {
+  margin-left: 8px;
+  padding: 2px 8px;
+  font-size: 11px;
+>>>>>>> 72094960a3df44080e7a925352d2bff5007d8ed3
   border-radius: 4px;
   box-shadow: 0 2px 4px rgba(0,0,0,0.2);
 }
+<<<<<<< HEAD
 .passenger-dot.waiting { background: #f59e0b; }
 .passenger-dot.inside { background: #22c55e; }
 .passenger-dot.jammed { background: #ef4444; animation: blink 1s infinite; }
@@ -426,6 +548,30 @@ body {
   box-shadow: var(--shadow-soft);
   padding: 32px;
   border-top: 4px solid #64748b; /* 시각적 구분 */
+=======
+
+.unload-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* 푸터 */
+
+.dash-footer {
+  margin-top: 24px;
+  font-size: 0.8rem;
+  color: #9ca3af;
+  text-align: center;
+}
+
+/* ===========================
+   끼임 승객 관련 스타일
+   =========================== */
+
+/* 끼임 승객(빨간 네모) */
+.passenger-dot.jammed {
+  background-color: #ef4444;
+>>>>>>> 72094960a3df44080e7a925352d2bff5007d8ed3
 }
 
 .backend-header {
@@ -489,6 +635,7 @@ body {
   font-size: 0.85rem;
 }
 
+<<<<<<< HEAD
 .backend-table td {
   color: #334155;
   font-feature-settings: "tnum"; /* 숫자 등폭 */
@@ -539,19 +686,52 @@ body {
   margin-top: 24px;
   padding-top: 16px;
   border-top: 1px dashed #e2e8f0;
+=======
+/* 끼임 승객 테스트 패널 */
+
+.jam-section {
+  margin-top: 18px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid #fecaca;
+  background: linear-gradient(135deg, #fff0db, #fefee2);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+}
+
+.jam-section h3 {
+  margin: 0 0 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #b91c1c;
+>>>>>>> 72094960a3df44080e7a925352d2bff5007d8ed3
 }
 
 .jam-btn {
   width: 100%;
+<<<<<<< HEAD
   padding: 10px;
   background: #fef2f2;
   color: #ef4444;
   border: 1px solid #fecaca;
   border-radius: 8px;
+=======
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid #fca5a5;
+  background: #fee2e2;
+  color: #b91c1c;
+  font-size: 0.85rem;
+>>>>>>> 72094960a3df44080e7a925352d2bff5007d8ed3
   font-weight: 600;
   cursor: pointer;
+  transition: background-color 0.18s ease, border-color 0.18s ease,
+    transform 0.08s ease, box-shadow 0.18s ease, color 0.18s ease;
 }
 
+<<<<<<< HEAD
 .level-section {
   display: flex;
   flex-direction: column;
@@ -563,11 +743,74 @@ body {
   color: #d97706;
   border: 1px solid #fde68a;
   padding: 10px;
+=======
+.jam-btn:hover {
+  background: #fecaca;
+  border-color: #f87171;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(185, 28, 28, 0.18);
+}
+
+.jam-hint {
+  margin-top: 6px;
+  font-size: 0.75rem;
+  line-height: 1.3;
+  color: #7f1d1d;
+}
+
+/* ===========================
+   정위치 정차 실패 테스트 섹션
+   =========================== */
+
+.level-section {
+  margin-top: 18px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid #facc15;
+  background: linear-gradient(135deg, #fefce8, #fffbeb);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+}
+
+.level-section h3 {
+  margin: 0 0 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #92400e;
+}
+
+.level-error-btn,
+.level-fix-btn {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 10px;
+  margin-bottom: 6px;
+>>>>>>> 72094960a3df44080e7a925352d2bff5007d8ed3
   border-radius: 8px;
   font-weight: 600;
   cursor: pointer;
 }
 
+<<<<<<< HEAD
+=======
+/* 정위치 실패 유도 버튼 */
+.level-error-btn {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #b91c1c;
+  box-shadow: 0 1px 2px rgba(185, 28, 28, 0.12);
+}
+
+.level-error-btn:hover {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(185, 28, 28, 0.18);
+}
+
+/* 정위치 자동 수정 버튼 */
+>>>>>>> 72094960a3df44080e7a925352d2bff5007d8ed3
 .level-fix-btn {
   background: #eff6ff;
   color: #2563eb;
@@ -577,6 +820,17 @@ body {
   font-weight: 600;
   cursor: pointer;
 }
+<<<<<<< HEAD
+=======
+
+.level-fix-btn:hover:not(:disabled) {
+  background: #dbeafe;
+  border-color: #93c5fd;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.18);
+}
+
+>>>>>>> 72094960a3df44080e7a925352d2bff5007d8ed3
 .level-fix-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -585,9 +839,183 @@ body {
   border-color: #e2e8f0;
 }
 
+<<<<<<< HEAD
 .dash-footer {
   margin-top: 40px;
   text-align: center;
   color: #94a3b8;
   font-size: 0.85rem;
 }
+=======
+.level-hint {
+  margin-top: 4px;
+  font-size: 0.75rem;
+  line-height: 1.3;
+  color: #92400e;
+}
+
+/* ===========================
+   백엔드 연동 섹션 (하단 전체)
+   =========================== */
+
+.backend-section {
+  margin: 0 auto;
+  margin-top: 32px;
+  max-width: 1120px;
+  padding: 20px 24px 22px;
+  border-radius: 26px;
+  background: #ffffff;
+  box-shadow: var(--shadow-soft);
+  box-sizing: border-box;
+}
+
+/* 제목/부제목 텍스트 */
+
+.backend-section h2 {
+  margin: 0 0 6px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.backend-section h3 {
+  margin: 18px 0 6px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.backend-section p {
+  margin: 4px 0;
+  font-size: 0.86rem;
+  line-height: 1.5;
+  color: #4b5563;
+}
+
+.backend-section .backend-muted {
+  font-size: 0.8rem;
+  color: #9ca3af;
+}
+
+/* 예시 로그/텍스트 블록 */
+
+.backend-log-block {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: #f9fafb;
+  border: 1px solid rgba(209, 213, 219, 0.9);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: #4b5563;
+  white-space: pre-line;
+}
+
+/* 옵션: 행렬 형태로 센서 값을 표시하고 싶을 때 사용하는 스타일들 */
+
+.backend-grid {
+  width: 100%;
+  border-radius: 16px;
+  background: #f9fafb;
+  padding: 10px 12px;
+  box-sizing: border-box;
+  border: 1px solid rgba(209, 213, 219, 0.9);
+}
+
+.backend-row {
+  display: grid;
+  grid-template-columns: 160px repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding: 6px 4px;
+  align-items: center;
+  font-size: 0.82rem;
+}
+
+.backend-row + .backend-row {
+  border-top: 1px dashed rgba(209, 213, 219, 0.8);
+}
+
+.backend-row.header {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.backend-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 20px;
+}
+
+.backend-cell.label {
+  font-weight: 500;
+  color: #111827;
+}
+
+/* 칩/뱃지 형태 상태 표시 */
+
+.backend-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  border: 1px solid transparent;
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.backend-tag.ok {
+  background: #dcfce7;
+  border-color: #bbf7d0;
+  color: #166534;
+}
+
+.backend-tag.warn {
+  background: #fef9c3;
+  border-color: #fde68a;
+  color: #92400e;
+}
+
+.backend-tag.error {
+  background: #fee2e2;
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+
+.backend-tag.info {
+  background: #dbeafe;
+  border-color: #bfdbfe;
+  color: #1d4ed8;
+}
+
+.backend-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #22c55e;
+}
+
+.backend-status-dot.error {
+  background: #ef4444;
+}
+
+.backend-status-dot.warn {
+  background: #facc15;
+}
+
+.backend-status-label {
+  font-size: 0.78rem;
+  color: #4b5563;
+}
+
+.backend-extra-note {
+  margin-top: 8px;
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+>>>>>>> 72094960a3df44080e7a925352d2bff5007d8ed3

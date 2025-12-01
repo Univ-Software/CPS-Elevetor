@@ -115,7 +115,24 @@ function Dashboard() {
     }
   }
 
+<<<<<<< HEAD
   // ▼▼▼ [수정된 부분] 수동 하차 버튼 핸들러 ▼▼▼
+=======
+  // -------------------------
+  // 정위치 정차 실패 모드 ON (다음 정차에서 발동)
+  // -------------------------
+  const handleStartMisalignTest = () => {
+    if (isMisaligned) {
+      alert("이미 정위치 정차 실패 상태입니다. 먼저 정위치 자동 수정을 해주세요.")
+      return
+    }
+    setMisalignMode(true)
+  }
+
+  // -------------------------
+  // 승객 강제 하차 (문 열려 있을 때만)
+  // -------------------------
+>>>>>>> 72094960a3df44080e7a925352d2bff5007d8ed3
   const handleUnloadPassenger = (id) => {
     if (!doorLooksOpen) {
       alert("문이 열린 상태에서만 승객이 내릴 수 있습니다.")
@@ -125,7 +142,12 @@ function Dashboard() {
     const passengerToUnload = passengers.find((p) => p.id === id)
     if (!passengerToUnload || passengerToUnload.status !== "onboard") return
 
+<<<<<<< HEAD
     // 1. 화면상 승객 하차 처리 (상태 변경)
+=======
+    const destFloor = passengerToUnload.to
+
+>>>>>>> 72094960a3df44080e7a925352d2bff5007d8ed3
     setPassengers((prev) =>
       prev.map((p) =>
         p.id === id && p.status === "onboard"
@@ -134,6 +156,7 @@ function Dashboard() {
       )
     )
 
+<<<<<<< HEAD
     // 2. 큐 정리 로직 (하차한 승객의 목적지 층 삭제 여부 판단)
     const destFloor = passengerToUnload.to
     
@@ -148,6 +171,20 @@ function Dashboard() {
        if (p.status === "waiting" && p.from === destFloor) return true
        
        return false
+=======
+    setQueue((prevQueue) => {
+      if (!destFloor || !prevQueue.includes(destFloor)) return prevQueue
+
+      const stillGoing = passengers.some(
+        (p) =>
+          p.id !== id &&
+          p.status !== "done" &&
+          p.to === destFloor
+      )
+
+      if (stillGoing) return prevQueue
+      return prevQueue.filter((f) => f !== destFloor)
+>>>>>>> 72094960a3df44080e7a925352d2bff5007d8ed3
     })
 
     // 아무도 그 층을 원하지 않으면 큐에서 삭제 요청
@@ -157,9 +194,140 @@ function Dashboard() {
   }
   // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
+<<<<<<< HEAD
   // --------------------------------------------------------
   // 5. [핵심] 문이 열렸을 때 탑승 및 하차 로직
   // --------------------------------------------------------
+=======
+  // -------------------------
+  // 문 열림/닫힘 버튼
+  // -------------------------
+  const handleDoorOpenButton = () => {
+    if (doorState === "open" || doorState === "opening") return
+    if (isMoving) return
+    setDoorState("opening")
+  }
+
+  const handleDoorCloseButton = () => {
+    if (doorState === "closed" || doorState === "closing") return
+
+    if (isOverload) {
+      alert("적재량 500kg을 초과하여 문을 닫을 수 없습니다. 승객을 내려주세요.")
+      return
+    }
+
+    setDoorState("closing")
+  }
+
+  // -------------------------
+  // 엘리베이터 이동 로직
+  // -------------------------
+  useEffect(() => {
+    if (doorState !== "closed") {
+      setDirection("idle")
+      return
+    }
+
+    if (queue.length === 0) {
+      setDirection("idle")
+      return
+    }
+
+    if (isMoving) return
+
+    const target = queue[0]
+
+    if (target === currentFloor) {
+      setDirection("idle")
+      return
+    }
+
+    const distanceFloors = Math.abs(target - currentFloor)
+    const travelTime = TIME_PER_FLOOR * distanceFloors
+
+    setMoveDuration(travelTime)
+    setDirection(target > currentFloor ? "up" : "down")
+
+    // ---- 정위치 실패 모드 적용 ----
+    let visualTargetFloor = target
+    if (misalignMode && !isMisaligned) {
+      const OFFSET_RANGE = 0.4
+      const offset = (Math.random() * 2 - 1) * OFFSET_RANGE // -0.4 ~ +0.4
+      let misFloor = target + offset
+      if (misFloor < 1) misFloor = 1
+      if (misFloor > 5) misFloor = 5
+
+      visualTargetFloor = misFloor
+      setIsMisaligned(true)
+    }
+
+    setCarFloor(visualTargetFloor)
+
+    moveRef.current = { floor: currentFloor, time: performance.now() }
+
+    const id = setTimeout(() => {
+      setCurrentFloor(target)
+      if (misalignMode) {
+        setMisalignMode(false)
+      }
+    }, travelTime)
+
+    return () => {
+      void id
+    }
+  }, [queue, currentFloor, doorState, isMoving, misalignMode, isMisaligned])
+
+  // -------------------------
+  // 도착 후 멈춘 상태에서만 문 자동 열기 (정위치 실패 시 자동 오픈 X)
+  // -------------------------
+  useEffect(() => {
+    if (doorState !== "closed") return
+    if (queue.length === 0) return
+    if (isMoving) return
+    if (isMisaligned) return
+
+    const target = queue[0]
+    if (target === currentFloor && carFloor === currentFloor) {
+      setDoorState("opening")
+    }
+  }, [doorState, queue, currentFloor, carFloor, isMoving, isMisaligned])
+
+  // -------------------------
+  // 문 상태 타이밍 + 끼임 로직
+  // -------------------------
+  useEffect(() => {
+    let timerId
+
+    if (doorState === "opening") {
+      timerId = setTimeout(() => {
+        setDoorState("open")
+      }, DOOR_OPEN_TIME)
+    } else if (doorState === "open") {
+      if (!isOverload) {
+        timerId = setTimeout(() => {
+          setDoorState("closing")
+        }, DOOR_DWELL_TIME)
+      }
+    } else if (doorState === "closing") {
+      if (hasJammedOnboard) {
+        // 끼임 승객이 탑승 중이면 "닫히는 중" 상태 유지
+      } else {
+        timerId = setTimeout(() => {
+          setDoorState("closed")
+          setQueue((prev) =>
+            prev.length > 0 && prev[0] === currentFloor ? prev.slice(1) : prev
+          )
+        }, DOOR_CLOSE_TIME)
+      }
+    }
+
+    return () => clearTimeout(timerId)
+  }, [doorState, currentFloor, isOverload, hasJammedOnboard])
+
+  // -------------------------
+  // 문이 "완전히 열린 순간" 탑승/하차
+  // -------------------------
+>>>>>>> 72094960a3df44080e7a925352d2bff5007d8ed3
   useEffect(() => {
     // 문이 활짝 열렸을 때만 수행
     if (doorState !== "open") return
@@ -189,11 +357,68 @@ function Dashboard() {
     })
   }, [doorState, currentFloor, ctrl]) 
 
+<<<<<<< HEAD
   // --------------------------------------------------------
   // 6. UI 렌더링
   // --------------------------------------------------------
   const statusLabel = direction === "idle" ? "대기" : direction === "up" ? "상행" : "하행"
   const statusColor = direction === "idle" ? "#6b7280" : direction === "up" ? "#2563eb" : "#dc2626"
+=======
+  // -------------------------
+  // 정위치 자동 수정
+  // -------------------------
+  const handleFixMisalign = () => {
+    if (!isMisaligned) {
+      alert("현재 정위치 정차 실패 상태가 아닙니다.")
+      return
+    }
+
+    let nearestFloor = Math.round(carFloor)
+    if (nearestFloor < 1) nearestFloor = 1
+    if (nearestFloor > 5) nearestFloor = 5
+
+    const distanceFloors = Math.abs(nearestFloor - carFloor)
+    const travelTime = TIME_PER_FLOOR * distanceFloors
+
+    if (travelTime === 0) {
+      setCarFloor(nearestFloor)
+      setCurrentFloor(nearestFloor)
+      setIsMisaligned(false)
+      return
+    }
+
+    setMoveDuration(travelTime)
+    setDirection(nearestFloor > carFloor ? "up" : "down")
+    setCarFloor(nearestFloor)
+
+    moveRef.current = { floor: currentFloor, time: performance.now() }
+
+    setTimeout(() => {
+      setCurrentFloor(nearestFloor)
+      setIsMisaligned(false)
+    }, travelTime)
+  }
+
+  // -------------------------
+  // 엘리베이터 위치 계산 (시각용은 carFloor 사용)
+  // -------------------------
+  const currentIndex = floorIndexFromBottom(carFloor)
+  const rawBottom = currentIndex * FLOOR_HEIGHT + FLOOR_BASE_OFFSET + 10
+  const carBottom = rawBottom < 0 ? 0 : rawBottom
+
+  // -------------------------
+  // 표시용 텍스트/색
+  // -------------------------
+  const statusLabel =
+    direction === "idle" ? "대기" : direction === "up" ? "상행" : "하행"
+
+  const statusColor =
+    direction === "idle"
+      ? "#6b7280"
+      : direction === "up"
+      ? "#2563eb"
+      : "#dc2626"
+>>>>>>> 72094960a3df44080e7a925352d2bff5007d8ed3
 
   return (
     <div className="Dashboard">
@@ -207,6 +432,10 @@ function Dashboard() {
             <p className="queue-info">
               대기 큐: {queue.length === 0 ? "없음" : queue.join(" → ")}
             </p>
+<<<<<<< HEAD
+=======
+
+>>>>>>> 72094960a3df44080e7a925352d2bff5007d8ed3
             <p className="capacity-info">
               정격 적재 {MAX_LOAD_KG}kg ·{" "}
               <span className={`capacity-count ${isOverload ? "full" : ""}`}>
@@ -298,14 +527,21 @@ function Dashboard() {
               정위치 자동 수정
             </button>
             <p className="level-hint">
+<<<<<<< HEAD
               정위치 실패 모드를 켜면 다음 목표 층에서 1~5층 사이 랜덤 위치에 정차하고 문이 열리지 않습니다.
               "정위치 자동 수정"을 누르면 가장 가까운 층으로 이동 후 정상 동작합니다.
+=======
+              정위치 실패 모드를 켜면 다음 목표 층에서 1~5층 사이 랜덤 위치에
+              정차하고, 문이 열리지 않습니다. "정위치 자동 수정"을 누르면 가장
+              가까운 층으로 이동한 뒤 정상 동작합니다.
+>>>>>>> 72094960a3df44080e7a925352d2bff5007d8ed3
             </p>
           </div>
         </div>
 
         {/* 가운데: 샤프트 (그래픽) */}
         <div className="shaft">
+<<<<<<< HEAD
            <div className="shaft-scene">
              {FLOORS.map((f) => {
                const idx = floorIndexFromBottom(f)
@@ -313,6 +549,15 @@ function Dashboard() {
                const waitingHere = visiblePassengers.filter(
                  (p) => p.status === "waiting" && p.from === f
                )
+=======
+          <div className="shaft-scene">
+            {FLOORS.map((f) => {
+              const idx = floorIndexFromBottom(f)
+              const bottom = idx * FLOOR_HEIGHT + FLOOR_BASE_OFFSET
+              const waitingHere = visiblePassengers.filter(
+                (p) => p.status === "waiting" && p.from === f
+              )
+>>>>>>> 72094960a3df44080e7a925352d2bff5007d8ed3
 
                return (
                  <div key={f} className="floor-layer" style={{ bottom: `${bottom}px` }}>
@@ -357,8 +602,47 @@ function Dashboard() {
                     ))}
                   </div>
                 </div>
+<<<<<<< HEAD
              </div>
            </div>
+=======
+              )
+            })}
+
+            <div className="shaft-wall" />
+
+            <div
+              className={`elevator-car side ${
+                doorLooksOpen ? "open" : "closed"
+              }`}
+              style={{
+                bottom: `${carBottom}px`,
+                transitionDuration: `${moveDuration}ms`,
+              }}
+            >
+              <div className="car-inner">
+                <div className={`car-door side door-${doorState}`}>
+                  <div className="door-panel left" />
+                  <div className="door-panel right" />
+                </div>
+
+                <div className="car-people-inside">
+                  {onboardPassengers.map((p) => (
+                    <div
+                      key={p.id}
+                      className={
+                        "passenger-dot inside" + (p.isJammed ? " jammed" : "")
+                      }
+                      title={`${p.from}층 → ${p.to}층 (${p.weightKg}kg)${
+                        p.isJammed ? " / 끼임 승객" : ""
+                      }`}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+>>>>>>> 72094960a3df44080e7a925352d2bff5007d8ed3
         </div>
 
         {/* 오른쪽: 외부 패널 */}
@@ -482,8 +766,99 @@ function Dashboard() {
             </div>
           </div>
         </div>
+<<<<<<< HEAD
       </section>
       
+=======
+      </div>
+
+      {/* ▼ 백엔드 연동 섹션 (하단 가로 전체) */}
+      <section className="backend-panel">
+        <div className="backend-inner">
+          <div className="backend-header">
+            <h2>백엔드 연동 · 센서 데이터 모니터링</h2>
+            <p className="backend-subtitle">
+              엘리베이터 상태를 백엔드와 주고받는 영역입니다. 아래 행렬/테이블은
+              나중에 API 응답 값으로 채울 예정입니다.
+            </p>
+          </div>
+
+          <div className="backend-grid">
+            {/* 왼쪽: 현재 센서/상태 요약 (행렬 형태로 쓸 자리) */}
+            <div className="backend-card">
+              <h3>실시간 센서 값 (예시)</h3>
+              <table className="backend-table">
+                <thead>
+                  <tr>
+                    <th>항목</th>
+                    <th>값</th>
+                    <th>단위</th>
+                    <th>상태</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>현재 층</td>
+                    <td>{currentFloor}</td>
+                    <td>층</td>
+                    <td>-</td>
+                  </tr>
+                  <tr>
+                    <td>카 위치</td>
+                    <td>{carBottom.toFixed(1)}</td>
+                    <td>px</td>
+                    <td>{isMisaligned ? "정위치 실패" : "정상"}</td>
+                  </tr>
+                  <tr>
+                    <td>속도</td>
+                    <td>{speedFloorsPerSec.toFixed(2)}</td>
+                    <td>층/초</td>
+                    <td>{isMoving ? "이동 중" : "정지"}</td>
+                  </tr>
+                  <tr>
+                    <td>문 상태</td>
+                    <td>{doorState}</td>
+                    <td>-</td>
+                    <td>{hasJammedOnboard ? "끼임 감지" : "정상"}</td>
+                  </tr>
+                  <tr>
+                    <td>적재량</td>
+                    <td>{onboardWeightKg}</td>
+                    <td>kg</td>
+                    <td>{isOverload ? "과부하" : "정상"}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* 오른쪽: 백엔드 응답 / 이벤트 로그 자리 */}
+            <div className="backend-card backend-log">
+              <h3>백엔드 이벤트 / 알람 로그</h3>
+              <p className="backend-log-hint">
+                여기에는 추후 백엔드에서 내려주는{" "}
+                <code>위험도 행렬</code>, <code>알람 리스트</code>,
+                <code>제어 명령 이력</code> 등을 표시할 예정입니다.
+                지금은 레이아웃만 잡혀 있으며, 실제 데이터는 API 연동 후
+                채워넣으면 됩니다.
+              </p>
+
+              <div className="backend-log-list">
+                <div className="backend-log-item placeholder">
+                  예) [WARN] 3층 · 과부하 감지 (520kg)
+                </div>
+                <div className="backend-log-item placeholder">
+                  예) [INFO] 정위치 자동 수정 완료 (4F)
+                </div>
+                <div className="backend-log-item placeholder">
+                  예) [ALERT] 문 끼임 감지 · 즉시 정지
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+>>>>>>> 72094960a3df44080e7a925352d2bff5007d8ed3
       <footer className="dash-footer">© 2025 CPS Elevator System</footer>
     </div>
   )
