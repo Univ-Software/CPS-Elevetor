@@ -27,7 +27,14 @@ function Dashboard() {
 
   const addLogEntry = useCallback((entry) => {
     setLogEntries(prev => {
-      const next = [entry, ...prev]
+      // 중복 연속 항목 처리: 최신 항목과 level+message가 같으면 카운트 증가
+      const latest = prev[0]
+      if (latest && latest.level === entry.level && latest.message === entry.message) {
+        const updated = [{ ...latest, timestamp: entry.timestamp, count: (latest.count || 1) + 1 }, ...prev.slice(1)]
+        return updated.slice(0, 200)
+      }
+
+      const next = [{ ...entry, count: 1 }, ...prev]
       // 최대 200개까지만 보관
       return next.slice(0, 200)
     })
@@ -49,8 +56,8 @@ function Dashboard() {
 
   // ▼▼▼ [추가] 백엔드 명령 처리 핸들러 ▼▼▼
   const handleBackendCommand = useCallback((command) => {
-    // 로그에 표시
-    const msg = `[CMD] ${command.type}: ${command.message || ''}`;
+    // 로그에 표시 (메시지 본문에 레벨 태그를 포함하지 않음)
+    const msg = `${command.type}: ${command.message || ''}`;
     setLastCommand(msg);
     addLogEntry({ timestamp: new Date().toISOString(), level: 'CMD', message: msg })
 
@@ -182,19 +189,19 @@ function Dashboard() {
   // 상태 변화 시 로그 추가 (중복 방지를 위해 true로 변할 때만 누적)
   useEffect(() => {
     if (isMisaligned) {
-      addLogEntry({ timestamp: new Date().toISOString(), level: 'WARN', message: '[WARN] 정위치 정차 실패 감지' })
+      addLogEntry({ timestamp: new Date().toISOString(), level: 'WARN', message: '정위치 정차 실패 감지' })
     }
   }, [isMisaligned])
 
   useEffect(() => {
     if (isOverload) {
-      addLogEntry({ timestamp: new Date().toISOString(), level: 'ALERT', message: '[ALERT] 과부하 알림 (500kg 초과)' })
+      addLogEntry({ timestamp: new Date().toISOString(), level: 'ALERT', message: '과부하 알림 (500kg 초과)' })
     }
   }, [isOverload])
 
   useEffect(() => {
     if (hasJammedOnboard) {
-      addLogEntry({ timestamp: new Date().toISOString(), level: 'ALERT', message: '[ALERT] 문 끼임 승객 감지' })
+      addLogEntry({ timestamp: new Date().toISOString(), level: 'ALERT', message: '문 끼임 승객 감지' })
     }
   }, [hasJammedOnboard])
 
@@ -356,6 +363,7 @@ function Dashboard() {
                     return (
                       <div key={entry.timestamp + entry.message} className="backend-log-item" style={{ color }}>
                         [{new Date(entry.timestamp).toLocaleTimeString()}] [{entry.level}] {entry.message}
+                        {entry.count && entry.count > 1 ? ` (×${entry.count})` : ''}
                       </div>
                     )
                   })
