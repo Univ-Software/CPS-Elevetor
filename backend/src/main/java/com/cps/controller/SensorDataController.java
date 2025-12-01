@@ -6,6 +6,7 @@ import com.cps.dto.SensorDataResponse;
 import com.cps.repository.SensorDataRepository;
 import com.cps.service.DangerLevel;
 import com.cps.service.ElevatorLoggerService;
+import com.cps.service.ElevatorStateTracker;
 import com.cps.service.SensorAnalysisService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,7 +19,9 @@ import java.time.format.DateTimeFormatter;
 
 /**
  * WebSocket controller for handling elevator sensor data
- * Flow: Receive → Parse → Analyze → Save → Log → Respond
+ * Flow: Receive → Parse → Analyze → Check State Change → Save (if changed) → Log (if changed) → Respond
+ *
+ * Note: For idle/LOW states, only saves and logs ONCE when entering idle, not repeatedly
  */
 @Controller
 @RequiredArgsConstructor
@@ -28,6 +31,7 @@ public class SensorDataController {
     private final SensorDataRepository sensorDataRepository;
     private final SensorAnalysisService analysisService;
     private final ElevatorLoggerService loggerService;
+    private final ElevatorStateTracker stateTracker;
 
     /**
      * Endpoint for receiving sensor data from frontend
@@ -35,7 +39,7 @@ public class SensorDataController {
      * Response broadcasts to: /topic/sensor-response
      *
      * @param request Sensor data from frontend (parsed automatically)
-     * @return Response with analysis results
+     * @return Response with analysis results (null = no broadcast)
      */
     @MessageMapping("/sensor-data")
     @SendTo("/topic/sensor-response")
@@ -54,15 +58,25 @@ public class SensorDataController {
             DangerLevel dangerLevel = analysisService.analyzeDangerLevel(request);
             String analysisMessage = analysisService.generateAnalysisMessage(request, dangerLevel);
 
-            // Step 4: Build and save entity to database
-            SensorData sensorData = buildSensorData(request, dangerLevel, analysisMessage, receivedTimestamp);
-            SensorData savedData = sensorDataRepository.save(sensorData);
+            // Step 4: Check if this state change should be saved and logged
+            // For idle states, only save/log ONCE when entering idle
+            boolean shouldSaveAndLog = stateTracker.shouldSaveAndLog(request, dangerLevel);
 
-            // Step 5: Log with appropriate danger level
-            loggerService.logSensorData(savedData);
+            if (shouldSaveAndLog) {
+                // Step 5: Build and save entity to database
+                SensorData sensorData = buildSensorData(request, dangerLevel, analysisMessage, receivedTimestamp);
+                SensorData savedData = sensorDataRepository.save(sensorData);
 
-            // Step 6: Build and return response
-            return buildSuccessResponse(savedData);
+                // Step 6: Log with appropriate danger level
+                loggerService.logSensorData(savedData);
+
+                // Step 7: Build and return response (broadcast to frontend)
+                return buildSuccessResponse(savedData);
+            } else {
+                // State hasn't changed significantly - don't save, don't log, don't broadcast
+                log.trace("Skipping save/log for unchanged state: {} - {}", request.getElevatorId(), dangerLevel);
+                return null; // Returning null prevents broadcast to /topic/sensor-response
+            }
 
         } catch (Exception e) {
             log.error("Error processing sensor data: {}", e.getMessage(), e);
