@@ -46,11 +46,11 @@ public class ElevatorLoggerService {
      */
     private String formatLogMessage(SensorData sensorData) {
         return String.format(
-            "Elevator[%s] | Floor: %d (%.2f) | Speed: %.2f f/s | Door: %s | Direction: %s | " +
+            "Elevator[%s] | Floor: %.2f (%d) | Speed: %.2f f/s | Door: %s | Direction: %s | " +
             "Overload: %s | Jammed: %s | Analysis: %s | Time: %s",
             sensorData.getElevatorId(),
-            sensorData.getCurrentFloor(),
             sensorData.getRealtimeFloor(),
+            sensorData.getCurrentFloor(),
             sensorData.getSpeed(),
             sensorData.getDoorStatus(),
             sensorData.getDirection(),

@@ -112,7 +112,7 @@ export function useElevatorNetwork(elevatorState, onCommandReceived) {
 
       try {
         clientRef.current.publish({
-          destination: "/api/sensor-data",
+          destination: "/app/sensor-data",
           body: JSON.stringify(payload),
         });
       } catch (err) {
