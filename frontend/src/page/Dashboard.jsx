@@ -56,8 +56,8 @@ function Dashboard() {
 
   // ▼▼▼ [추가] 백엔드 명령 처리 핸들러 ▼▼▼
   const handleBackendCommand = useCallback((command) => {
-    // 로그에 표시
-    const msg = `[CMD] ${command.type}: ${command.message || ''}`;
+    // 로그에 표시 (메시지 본문에 레벨 태그를 포함하지 않음)
+    const msg = `${command.type}: ${command.message || ''}`;
     setLastCommand(msg);
     addLogEntry({ timestamp: new Date().toISOString(), level: 'CMD', message: msg })
 
@@ -189,19 +189,19 @@ function Dashboard() {
   // 상태 변화 시 로그 추가 (중복 방지를 위해 true로 변할 때만 누적)
   useEffect(() => {
     if (isMisaligned) {
-      addLogEntry({ timestamp: new Date().toISOString(), level: 'WARN', message: '[WARN] 정위치 정차 실패 감지' })
+      addLogEntry({ timestamp: new Date().toISOString(), level: 'WARN', message: '정위치 정차 실패 감지' })
     }
   }, [isMisaligned])
 
   useEffect(() => {
     if (isOverload) {
-      addLogEntry({ timestamp: new Date().toISOString(), level: 'ALERT', message: '[ALERT] 과부하 알림 (500kg 초과)' })
+      addLogEntry({ timestamp: new Date().toISOString(), level: 'ALERT', message: '과부하 알림 (500kg 초과)' })
     }
   }, [isOverload])
 
   useEffect(() => {
     if (hasJammedOnboard) {
-      addLogEntry({ timestamp: new Date().toISOString(), level: 'ALERT', message: '[ALERT] 문 끼임 승객 감지' })
+      addLogEntry({ timestamp: new Date().toISOString(), level: 'ALERT', message: '문 끼임 승객 감지' })
     }
   }, [hasJammedOnboard])
 
