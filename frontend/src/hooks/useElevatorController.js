@@ -218,6 +218,18 @@ export function useElevatorController({ isOverload, hasJammedOnboard }) {
 
   // Action Handlers
   const openDoor = useCallback(() => {
+    // 문을 여는 요청을 처리할 때 정위치 실패 상태면 열리지 않도록 방지
+    if (isMisaligned) {
+      // 사용자에게 피드백(테스트용 알림)
+      try {
+        alert("정위치 실패 상태입니다. 문이 열리지 않습니다.");
+      } catch (e) {
+        // alert가 없거나 테스트 환경인 경우 콘솔로 대체
+        console.warn("Attempted to open door while misaligned");
+      }
+      return;
+    }
+
     if (doorState === "open" || doorState === "opening" || activeTargetRef.current) return;
     // 정위치 실패 시 문 열림 불가
     if (isMisaligned) return; 
