@@ -104,6 +104,9 @@ body {
   font-size: 0.85rem;
   font-weight: 600;
   color: #334155;
+  display: inline-block;
+  width: 80px;
+  text-align: center;
 }
 
 .door-buttons {
@@ -474,6 +477,7 @@ body {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.9rem;
+  table-layout: fixed;
 }
 
 .backend-table th,
