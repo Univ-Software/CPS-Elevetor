@@ -37,19 +37,19 @@ public class SensorAnalysisService {
         if (Boolean.TRUE.equals(request.getIsOverloaded())) {
             issues.add("Elevator overloaded");
             if (dangerLevel.ordinal() < DangerLevel.CRITICAL.ordinal()) {
-                dangerLevel = DangerLevel.CRITICAL;
+                dangerLevel = DangerLevel.WATCH;
             }
         }
 
         // Check for severe misalignment
         if (request.getRealtimeFloor() != null && request.getCurrentFloor() != null) {
             double misalignment = Math.abs(request.getRealtimeFloor() - request.getCurrentFloor());
-            if (misalignment > CRITICAL_MISALIGNMENT && "IDLE".equalsIgnoreCase(request.getDirection())) {
+            if (misalignment > CRITICAL_MISALIGNMENT && "IDLE".equalsIgnoreCase(request.getDirection())) {          // 0.35 이상의 misalignment
                 issues.add(String.format("Severe position misalignment: %.2f floors", misalignment));
                 if (dangerLevel.ordinal() < DangerLevel.CRITICAL.ordinal()) {
                     dangerLevel = DangerLevel.CRITICAL;
                 }
-            } else if (misalignment > MISALIGNMENT_THRESHOLD && "IDLE".equalsIgnoreCase(request.getDirection())) {
+            } else if (misalignment > MISALIGNMENT_THRESHOLD && "IDLE".equalsIgnoreCase(request.getDirection())) {  // 0.35 미만, 0.15 이상의 misalignment
                 issues.add(String.format("Position misalignment detected: %.2f floors", misalignment));
                 if (dangerLevel.ordinal() < DangerLevel.WATCH.ordinal()) {
                     dangerLevel = DangerLevel.WATCH;
