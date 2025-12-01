@@ -49,6 +49,19 @@ export function useElevatorNetwork(elevatorState, onCommandReceived) {
             console.error("Failed to parse response:", err);
           }
         });
+
+        //제어 명령 수신 (새로 추가된 로직)
+        client.subscribe("/topic/control", (message) => {
+          if (onCommandRef.current) {
+            try {
+              const command = JSON.parse(message.body);
+              console.log("📩 Command Received:", command);
+              onCommandRef.current(command); // Dashboard로 명령 전달
+            } catch (e) {
+              console.error("JSON Parse Error (Control):", e);
+            }
+          }
+        });
       },
       onStompError: (frame) => {
         console.error("❌ STOMP Error", frame);
