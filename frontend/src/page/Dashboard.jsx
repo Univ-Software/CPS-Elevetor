@@ -1,5 +1,5 @@
 // src/page/Dashboard.jsx
-import { useState, useEffect, useCallback } from "react" // useCallback 추가
+import { useState, useEffect, useCallback } from "react" 
 import "./Dashboard.css"
 import { useElevatorController } from "../hooks/useElevatorController"
 import { useElevatorNetwork } from "../hooks/useElevatorNetwork"
@@ -18,24 +18,15 @@ function Dashboard() {
   const [targetFloor, setTargetFloor] = useState(5)
   const [nextPassengerId, setNextPassengerId] = useState(1)
   
-  // [추가] 백엔드 명령 로그 표시용 상태
+  // 백엔드 명령 로그 표시용 상태
   const [lastCommand, setLastCommand] = useState(null)
-  // 누적 로그 항목 (최신 항목이 앞에 오도록 관리)
   const [logEntries, setLogEntries] = useState([
     { timestamp: new Date().toISOString(), level: 'INFO', message: '시스템 시작' }
   ])
 
   const addLogEntry = useCallback((entry) => {
     setLogEntries(prev => {
-      // 중복 연속 항목 처리: 최신 항목과 level+message가 같으면 카운트 증가
-      const latest = prev[0]
-      if (latest && latest.level === entry.level && latest.message === entry.message) {
-        const updated = [{ ...latest, timestamp: entry.timestamp, count: (latest.count || 1) + 1 }, ...prev.slice(1)]
-        return updated.slice(0, 200)
-      }
-
-      const next = [{ ...entry, count: 1 }, ...prev]
-      // 최대 200개까지만 보관
+      const next = [entry, ...prev]
       return next.slice(0, 200)
     })
   }, [])
@@ -54,15 +45,14 @@ function Dashboard() {
     hasJammedOnboard,
   })
 
-  // ▼▼▼ [추가] 백엔드 명령 처리 핸들러 ▼▼▼
+  // 백엔드 명령 처리 핸들러
   const handleBackendCommand = useCallback((command) => {
-    // 로그에 표시 (메시지 본문에 레벨 태그를 포함하지 않음)
-    const msg = `${command.type}: ${command.message || ''}`;
+    const msg = `[CMD] ${command.type}: ${command.message || ''}`;
     setLastCommand(msg);
     addLogEntry({ timestamp: new Date().toISOString(), level: 'CMD', message: msg })
 
     switch (command.type) {
-      case "FIX_ALIGNMENT": // 백엔드에서 이 타입을 보내면 실행
+      case "FIX_ALIGNMENT":
         if (ctrl.isMisaligned) {
             ctrl.fixMisalign();
         } else {
@@ -71,7 +61,6 @@ function Dashboard() {
         break;
       
       case "EMERGENCY_STOP":
-        // 추후 구현 가능 (모터 정지 등)
         alert("관제 센터로부터 비상 정지 명령 수신!");
         break;
 
@@ -79,9 +68,8 @@ function Dashboard() {
         console.log("Unknown command:", command);
     }
   }, [ctrl, addLogEntry]); 
-  // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
-  // 2. 네트워크 훅 연결 (상태 전송 + 명령 수신 핸들러 전달)
+  // 2. 네트워크 훅 연결
   const elevatorState = {
     currentFloor: ctrl.currentFloor,
     realtimeFloor: ctrl.realtimeFloor,
@@ -92,7 +80,6 @@ function Dashboard() {
     hasJammedOnboard,
   }
   
-  // handleBackendCommand를 두 번째 인자로 전달!
   const { isConnected } = useElevatorNetwork(elevatorState, handleBackendCommand)
 
   const { 
@@ -102,15 +89,18 @@ function Dashboard() {
 
   const doorLooksOpen = doorState === "open" || doorState === "opening"
 
-  // 헬퍼 계산
+  // 3. 화면 렌더링용 계산
   const floorIndexFromBottom = (f) => f - 1
   const currentIndex = floorIndexFromBottom(carFloor)
   const carBottom = Math.max(0, currentIndex * FLOOR_HEIGHT + FLOOR_BASE_OFFSET + 10)
+  
   const realtimeIndex = floorIndexFromBottom(realtimeFloor)
   const realtimePx = Math.max(0, realtimeIndex * FLOOR_HEIGHT + FLOOR_BASE_OFFSET + 10)
+  
+  // [수정] 실시간 층수 표시 (반올림)
   const displayFloor = Math.round(realtimeFloor)
 
-  // 이벤트 핸들러들
+  // 4. 이벤트 핸들러
   const handleAddPassenger = (e) => {
     e.preventDefault()
     if (spawnFloor === targetFloor) return alert("출발/목적층이 같습니다.")
@@ -167,8 +157,11 @@ function Dashboard() {
     if (!isStillNeeded) ctrl.removeRequest(destFloor)
   }
 
+  // 5. 문 열림 시 탑승/하차 (정위치 실패 시 차단)
   useEffect(() => {
-    if (doorState !== "open") return
+    // [수정] 정위치 실패(isMisaligned) 상태면 탑승 로직 차단
+    if (doorState !== "open" || isMisaligned) return
+
     setPassengers((prev) => {
       const boardingTargets = []
       const updated = prev.map((p) => {
@@ -184,26 +177,26 @@ function Dashboard() {
       boardingTargets.forEach(floor => ctrl.requestFloor(floor))
       return updated
     })
-  }, [doorState, currentFloor, ctrl])
+  }, [doorState, currentFloor, ctrl, isMisaligned])
 
-  // 상태 변화 시 로그 추가 (중복 방지를 위해 true로 변할 때만 누적)
+  // 로그 자동 추가
   useEffect(() => {
     if (isMisaligned) {
-      addLogEntry({ timestamp: new Date().toISOString(), level: 'WARN', message: '정위치 정차 실패 감지' })
+      addLogEntry({ timestamp: new Date().toISOString(), level: 'WARN', message: '[WARN] 정위치 정차 실패 감지' })
     }
-  }, [isMisaligned])
+  }, [isMisaligned, addLogEntry])
 
   useEffect(() => {
     if (isOverload) {
-      addLogEntry({ timestamp: new Date().toISOString(), level: 'ALERT', message: '과부하 알림 (500kg 초과)' })
+      addLogEntry({ timestamp: new Date().toISOString(), level: 'ALERT', message: '[ALERT] 과부하 알림 (500kg 초과)' })
     }
-  }, [isOverload])
+  }, [isOverload, addLogEntry])
 
   useEffect(() => {
     if (hasJammedOnboard) {
-      addLogEntry({ timestamp: new Date().toISOString(), level: 'ALERT', message: '문 끼임 승객 감지' })
+      addLogEntry({ timestamp: new Date().toISOString(), level: 'ALERT', message: '[ALERT] 문 끼임 승객 감지' })
     }
-  }, [hasJammedOnboard])
+  }, [hasJammedOnboard, addLogEntry])
 
   const statusLabel = direction === "idle" ? "대기" : direction === "up" ? "상행" : "하행"
   const statusColor = direction === "idle" ? "#6b7280" : direction === "up" ? "#2563eb" : "#dc2626"
@@ -218,6 +211,7 @@ function Dashboard() {
                {isConnected ? "● Online" : "○ Offline"}
             </p>
             <p>
+              {/* [수정] displayFloor 사용 */}
               현재 층: <b>{displayFloor}</b> <span style={{ color: statusColor }}>({statusLabel})</span>
             </p>
             <p className="queue-info">대기 큐: {queue.length === 0 ? "없음" : queue.join(" → ")}</p>
@@ -351,6 +345,7 @@ function Dashboard() {
                 </tbody>
               </table>
             </div>
+            
             <div className="backend-card backend-log">
               <h3>백엔드 이벤트 / 알람 로그</h3>
               <p className="backend-log-hint">로그 표시 영역</p>
@@ -363,7 +358,6 @@ function Dashboard() {
                     return (
                       <div key={entry.timestamp + entry.message} className="backend-log-item" style={{ color }}>
                         [{new Date(entry.timestamp).toLocaleTimeString()}] [{entry.level}] {entry.message}
-                        {entry.count && entry.count > 1 ? ` (×${entry.count})` : ''}
                       </div>
                     )
                   })
@@ -372,60 +366,76 @@ function Dashboard() {
             </div>
           </div>
         </div>
-        {/* [오른쪽] 위험 판단 행렬 (Risk Assessment Matrix) */}
-            <div className="backend-card">
-              <h3>🛡️ 자율 제어 위험 판단 행렬</h3>
-              
-              {/* 행렬 계산 로직 */}
-              {(() => {
-                // 1. 위험 요소 벡터 생성 (조건이 맞으면 1, 아니면 0)
-                // 개문발차(OpenMove): 문이 열려있는데(open/opening) 속도가 0.1 이상인 경우
-                const isOpenMoving = (doorState.includes("open") && Math.abs(speedFloorsPerSec) > 0.1);
 
-                const riskVector = [
-                  { id: "MISALIGN", label: "정위치오차", value: isMisaligned ? 1 : 0 },
-                  { id: "OVERLOAD", label: "과부하",    value: isOverload ? 1 : 0 },
-                  { id: "JAMMING",  label: "문 끼임",   value: hasJammedOnboard ? 1 : 0 },
-                  { id: "OPENMOVE", label: "개문발차",  value: isOpenMoving ? 1 : 0 },
+        {/* [오른쪽] 센서-시나리오 분석 행렬 (Sensor-Scenario Matrix) */}
+        <div className="backend-card" style={{marginTop: "24px"}}>
+              <h3>🛡️ 자율 제어 센서 분석 행렬</h3>
+              
+              {(() => {
+                // 1. 각 센서별 상태 판단 (0: 정상, 1: 비정상/위험)
+                const s_Floor = (displayFloor < 1 || displayFloor > 5) ? 1 : 0;
+                const s_Pos   = isMisaligned ? 1 : 0;
+                const s_Speed = (doorState.includes("open") && Math.abs(speedFloorsPerSec) > 0.1) ? 1 : 0;
+                const s_Door  = hasJammedOnboard ? 1 : 0;
+                const s_Load  = isOverload ? 1 : 0;
+
+                // 2. 시나리오별 행렬 데이터 구성
+                const matrixRows = [
+                  { 
+                    id: "SC1", 
+                    name: "1. 정위치 제어", 
+                    bits: [0, s_Pos, 0, 0, 0], 
+                    active: s_Pos === 1 
+                  },
+                  { 
+                    id: "SC2", 
+                    name: "2. 하중 제어", 
+                    bits: [0, 0, 0, 0, s_Load], 
+                    active: s_Load === 1 
+                  },
+                  { 
+                    id: "SC3", 
+                    name: "3. 승객 안전", 
+                    bits: [0, 0, s_Speed, s_Door, 0], 
+                    active: (s_Speed === 1 || s_Door === 1)
+                  },
                 ];
 
-                // 2. 위험 점수 합산 (Sigma)
-                const totalScore = riskVector.reduce((acc, curr) => acc + curr.value, 0);
-
-                // 3. 최종 판정 로직
-                let statusLevel = "NORMAL";
-                let statusText = "정상 운행 (Normal)";
-                
-                if (totalScore >= 2) {
-                  statusLevel = "CRITICAL";
-                  statusText = "🚨 비상 정지 (Emergency Stop)";
-                } else if (totalScore === 1) {
-                  statusLevel = "WARNING";
-                  statusText = "⚠️ 주의/감속 (Warning)";
-                }
+                const sensors = ["현재층", "카위치", "속도", "문상태", "적재량"];
 
                 return (
-                  <div className="matrix-container">
-                    {/* 상단: 입력 벡터 (0 / 1 표시) */}
-                    <div className="matrix-row inputs">
-                      {riskVector.map((item) => (
-                        <div key={item.id} className={`matrix-cell ${item.value === 1 ? "active" : ""}`}>
-                          <span className="matrix-label">{item.label}</span>
-                          <span className="matrix-bit">{item.value}</span>
-                        </div>
-                      ))}
-                    </div>
+                  <div className="matrix-wrapper">
+                    <table className="sensor-matrix">
+                      <thead>
+                        <tr>
+                          <th className="matrix-corner">SCENARIO \ SENSOR</th>
+                          {sensors.map((s, i) => <th key={i}>{s}</th>)}
+                          <th className="matrix-result-header">판정</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {matrixRows.map((row) => (
+                          <tr key={row.id} className={row.active ? "row-alert" : ""}>
+                            <td className="scenario-name">{row.name}</td>
+                            {row.bits.map((bit, i) => (
+                              <td key={i} className={`bit-cell ${bit === 1 ? "on" : "off"}`}>
+                                {bit}
+                              </td>
+                            ))}
+                            <td className="scenario-result">
+                              {row.active ? "🚨 위험" : "✅ 정상"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
 
-                    {/* 연결 연산자 (화살표 or 수식 느낌) */}
-                    <div className="matrix-operator">
-                      <span>∑ (Sum) = {totalScore}</span>
-                      <span className="arrow">⬇</span>
-                    </div>
-
-                    {/* 하단: 최종 판정 결과 */}
-                    <div className={`matrix-result ${statusLevel}`}>
-                      <div className="result-title">System Decision</div>
-                      <div className="result-value">{statusText}</div>
+                    <div className="system-summary">
+                      System Status: 
+                      {matrixRows.some(r => r.active) 
+                        ? <span className="crit"> ⚠️ ABNORMAL DETECTED</span> 
+                        : <span className="norm"> ✅ ALL SYSTEMS NORMAL</span>
+                      }
                     </div>
                   </div>
                 );
