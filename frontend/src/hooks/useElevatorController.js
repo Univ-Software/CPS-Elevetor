@@ -36,6 +36,13 @@ export function useElevatorController({ isOverload, hasJammedOnboard }) {
   // 1. 층 호출 요청 (스케줄러 호출 시 realtimeFloor 사용)
   // ----------------------------------------------------
   const requestFloor = useCallback((floor) => {
+    // ▼▼▼ [수정] 정위치 실패 상태면 호출 자체를 무시 (안전장치) ▼▼▼
+    if (isMisaligned) {
+      console.warn("🚨 Misaligned! Cannot accept new requests.");
+      return; 
+    }
+    // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+
     setQueue((prev) => {
       // 이미 큐에 있거나, 정차 중인 층이면 무시
       if (prev.includes(floor)) return prev;
@@ -44,11 +51,11 @@ export function useElevatorController({ isOverload, hasJammedOnboard }) {
       return buildQueueWithLook({
         prevQueue: prev,
         newFloors: [floor],
-        currentPos: realtimeFloor, // [핵심] 실수 위치 전달
+        currentPos: realtimeFloor, // 실수 위치 전달
         direction,
       });
     });
-  }, [currentFloor, realtimeFloor, direction, doorState]);
+  }, [currentFloor, realtimeFloor, direction, doorState, isMisaligned]); // isMisaligned 의존성 추가
 
   const removeRequest = useCallback((floor) => {
     setQueue((prev) => prev.filter((f) => f !== floor));
@@ -58,6 +65,14 @@ export function useElevatorController({ isOverload, hasJammedOnboard }) {
   // 2. 모터 이동 제어 (Retargeting 지원)
   // ----------------------------------------------------
   useEffect(() => {
+    // ▼▼▼ [수정] 정위치 실패 상태면 이동 로직 시작도 안 함 ▼▼▼
+    if (isMisaligned) {
+      setSpeedFloorsPerSec(0);
+      activeTargetRef.current = null;
+      return;
+    }
+    // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+
     // 1. 이동 불가 조건
     if (doorState !== "closed") {
       if (direction !== "idle") setDirection("idle");
@@ -76,7 +91,7 @@ export function useElevatorController({ isOverload, hasJammedOnboard }) {
 
     const target = queue[0];
 
-    // 3. 이미 도착한 상태면 처리 안 함 (문 열림 로직으로 넘어감)
+    // 3. 이미 도착한 상태면 처리 안 함
     if (target === currentFloor) {
       setDirection("idle");
       setSpeedFloorsPerSec(0);
@@ -84,29 +99,27 @@ export function useElevatorController({ isOverload, hasJammedOnboard }) {
       return;
     }
 
-    // 4. [핵심] 이미 이동 중인데 목표가 그대로라면 재시작 금지
-    //    단, 큐의 1번(target)이 바뀌었다면(중간 층 추가), 아래 로직을 수행해서 Retargeting 함
+    // 4. 이미 이동 중인데 목표가 그대로라면 재시작 금지
     if (activeTargetRef.current === target) {
       return;
     }
 
     // --- 이동 시작 (혹은 경로 수정) ---
     
-    // 기존 타이머 정리 (경로 수정 시 필수)
+    // 기존 타이머 정리
     if (timersRef.current.interval) clearInterval(timersRef.current.interval);
     if (timersRef.current.timeout) clearTimeout(timersRef.current.timeout);
 
     activeTargetRef.current = target; // 목표 갱신
 
-    // 거리 및 시간 계산 (현재 '실시간 위치' 기준)
+    // 거리 및 시간 계산
     const distanceFloors = Math.abs(target - realtimeFloor);
-    // 거리가 너무 가까우면 최소 시간 보장 (애니메이션 튐 방지)
     const travelTime = Math.max(TIME_PER_FLOOR * distanceFloors, 500);
 
     setMoveDuration(travelTime);
     setDirection(target > realtimeFloor ? "up" : "down");
 
-    // 정위치 실패 계산
+    // 정위치 실패 계산 (misalignMode가 켜져있을 때만)
     let visualTargetFloor = target;
     if (misalignMode && !isMisaligned) {
       const OFFSET_RANGE = 0.4;
@@ -116,11 +129,11 @@ export function useElevatorController({ isOverload, hasJammedOnboard }) {
       setIsMisaligned(true);
     }
 
-    setCarFloor(visualTargetFloor); // CSS 애니메이션 목표 설정
+    setCarFloor(visualTargetFloor);
 
     // --- 실시간 위치 계산 루프 ---
     const startTime = performance.now();
-    const startPos = realtimeFloor; // 현재 위치에서 출발
+    const startPos = realtimeFloor;
     const endPos = visualTargetFloor;
 
     const intervalId = setInterval(() => {
@@ -156,12 +169,12 @@ export function useElevatorController({ isOverload, hasJammedOnboard }) {
       activeTargetRef.current = null;
     }, travelTime);
 
-    // Ref에 저장 (Cleanup을 위해)
+    // Ref에 저장
     timersRef.current = { interval: intervalId, timeout: timeoutId };
 
-  }, [queue, currentFloor, doorState, realtimeFloor]); // realtimeFloor 의존성 중요
+  }, [queue, currentFloor, doorState, realtimeFloor, isMisaligned]); // isMisaligned 추가
 
-  // Cleanup: 컴포넌트 언마운트 시 타이머 정리
+  // Cleanup
   useEffect(() => {
     return () => {
       if (timersRef.current.interval) clearInterval(timersRef.current.interval);
@@ -170,7 +183,7 @@ export function useElevatorController({ isOverload, hasJammedOnboard }) {
   }, []);
 
   // ----------------------------------------------------
-  // 3. 자동 문 열림 & 상태 관리 (기존 유지)
+  // 3. 자동 문 열림 & 상태 관리
   // ----------------------------------------------------
   useEffect(() => {
     if (doorState !== "closed") return;
@@ -178,8 +191,6 @@ export function useElevatorController({ isOverload, hasJammedOnboard }) {
     if (isMisaligned) return;
 
     const target = queue[0];
-    // 물리적으로 거의 도착했고, 목표 층이 맞으면 문 열기
-    // 이동 중(activeTargetRef가 있음)에는 열지 않음
     if (target === currentFloor && activeTargetRef.current === null && Math.abs(carFloor - currentFloor) < 0.1) {
       setDoorState("opening");
     }
@@ -220,8 +231,10 @@ export function useElevatorController({ isOverload, hasJammedOnboard }) {
     }
 
     if (doorState === "open" || doorState === "opening" || activeTargetRef.current) return;
+    // 정위치 실패 시 문 열림 불가
+    if (isMisaligned) return; 
     setDoorState("opening");
-  }, [doorState]);
+  }, [doorState, isMisaligned]);
 
   const closeDoor = useCallback(() => {
     if (doorState === "closed" || doorState === "closing") return;
