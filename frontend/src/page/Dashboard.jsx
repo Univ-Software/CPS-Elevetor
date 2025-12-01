@@ -1,5 +1,5 @@
 // src/page/Dashboard.jsx
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react" // useCallback 추가
 import "./Dashboard.css"
 import { useElevatorController } from "../hooks/useElevatorController"
 import { useElevatorNetwork } from "../hooks/useElevatorNetwork"
@@ -17,6 +17,9 @@ function Dashboard() {
   const [spawnFloor, setSpawnFloor] = useState(1)
   const [targetFloor, setTargetFloor] = useState(5)
   const [nextPassengerId, setNextPassengerId] = useState(1)
+  
+  // [추가] 백엔드 명령 로그 표시용 상태
+  const [lastCommand, setLastCommand] = useState(null)
 
   const visiblePassengers = passengers.filter((p) => p.status !== "done")
   const onboardPassengers = passengers.filter((p) => p.status === "onboard")
@@ -26,12 +29,38 @@ function Dashboard() {
   const isOverload = onboardWeightKg > MAX_LOAD_KG
   const hasJammedOnboard = onboardPassengers.some((p) => p.isJammed)
 
+  // 1. 컨트롤러 사용
   const ctrl = useElevatorController({
     isOverload,
     hasJammedOnboard,
   })
 
-  // 네트워크 전송
+  // ▼▼▼ [추가] 백엔드 명령 처리 핸들러 ▼▼▼
+  const handleBackendCommand = useCallback((command) => {
+    // 로그에 표시
+    setLastCommand(`[CMD] ${command.type}: ${command.message || ''}`);
+
+    switch (command.type) {
+      case "FIX_ALIGNMENT": // 백엔드에서 이 타입을 보내면 실행
+        if (ctrl.isMisaligned) {
+            ctrl.fixMisalign();
+        } else {
+            console.log("이미 정위치 상태입니다.");
+        }
+        break;
+      
+      case "EMERGENCY_STOP":
+        // 추후 구현 가능 (모터 정지 등)
+        alert("관제 센터로부터 비상 정지 명령 수신!");
+        break;
+
+      default:
+        console.log("Unknown command:", command);
+    }
+  }, [ctrl]); 
+  // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+
+  // 2. 네트워크 훅 연결 (상태 전송 + 명령 수신 핸들러 전달)
   const elevatorState = {
     currentFloor: ctrl.currentFloor,
     realtimeFloor: ctrl.realtimeFloor,
@@ -41,7 +70,9 @@ function Dashboard() {
     isOverload,
     hasJammedOnboard,
   }
-  const { isConnected } = useElevatorNetwork(elevatorState)
+  
+  // handleBackendCommand를 두 번째 인자로 전달!
+  const { isConnected } = useElevatorNetwork(elevatorState, handleBackendCommand)
 
   const { 
     currentFloor, carFloor, realtimeFloor, queue, direction, doorState, 
@@ -50,16 +81,15 @@ function Dashboard() {
 
   const doorLooksOpen = doorState === "open" || doorState === "opening"
 
-  // 계산
+  // 헬퍼 계산
   const floorIndexFromBottom = (f) => f - 1
   const currentIndex = floorIndexFromBottom(carFloor)
   const carBottom = Math.max(0, currentIndex * FLOOR_HEIGHT + FLOOR_BASE_OFFSET + 10)
-  
   const realtimeIndex = floorIndexFromBottom(realtimeFloor)
   const realtimePx = Math.max(0, realtimeIndex * FLOOR_HEIGHT + FLOOR_BASE_OFFSET + 10)
   const displayFloor = Math.round(realtimeFloor)
 
-  // 핸들러
+  // 이벤트 핸들러들
   const handleAddPassenger = (e) => {
     e.preventDefault()
     if (spawnFloor === targetFloor) return alert("출발/목적층이 같습니다.")
@@ -98,7 +128,6 @@ function Dashboard() {
 
   const handleUnloadPassenger = (id) => {
     if (!doorLooksOpen) return alert("문이 열린 상태에서만 승객이 내릴 수 있습니다.")
-    
     const passengerToUnload = passengers.find((p) => p.id === id)
     if (!passengerToUnload || passengerToUnload.status !== "onboard") return
 
@@ -117,7 +146,6 @@ function Dashboard() {
     if (!isStillNeeded) ctrl.removeRequest(destFloor)
   }
 
-  // 문 열림 이벤트
   useEffect(() => {
     if (doorState !== "open") return
     setPassengers((prev) => {
@@ -288,6 +316,9 @@ function Dashboard() {
               <p className="backend-log-hint">로그 표시 영역</p>
               <div className="backend-log-list">
                 <div className="backend-log-item">[INFO] 시스템 시작</div>
+                {/* ▼▼▼ [추가] 백엔드 명령 수신 시 로그 표시 ▼▼▼ */}
+                {lastCommand && <div className="backend-log-item" style={{color: '#3b82f6'}}>{lastCommand}</div>}
+                
                 {isMisaligned && <div className="backend-log-item">[WARN] 정위치 정차 실패 감지</div>}
                 {isOverload && <div className="backend-log-item">[ALERT] 과부하 알림 (500kg 초과)</div>}
                 {hasJammedOnboard && <div className="backend-log-item">[ALERT] 문 끼임 승객 감지</div>}
