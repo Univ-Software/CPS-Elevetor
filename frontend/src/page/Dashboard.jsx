@@ -40,8 +40,16 @@ function Dashboard() {
 
   // Controller에서 상태 값 꺼내오기
   const { 
-    currentFloor, carFloor, queue, direction, doorState, 
-    moveDuration, speedFloorsPerSec, isMisaligned, isMoving 
+    currentFloor, 
+    carFloor, 
+    realtimeFloor, // [중요] 실시간 위치 계산값 (텍스트 표시용)
+    queue, 
+    direction, 
+    doorState, 
+    moveDuration, 
+    speedFloorsPerSec, 
+    isMisaligned, 
+    isMoving 
   } = ctrl
 
   const doorLooksOpen = doorState === "open" || doorState === "opening"
@@ -50,9 +58,15 @@ function Dashboard() {
   // 3. 화면 렌더링용 헬퍼 계산
   // --------------------------------------------------------
   const floorIndexFromBottom = (f) => f - 1
+  
+  // [A] 그래픽용 (CSS Animation): 목표치(carFloor)를 사용하여 부드럽게 이동
   const currentIndex = floorIndexFromBottom(carFloor)
-  const rawBottom = currentIndex * FLOOR_HEIGHT + FLOOR_BASE_OFFSET + 10
-  const carBottom = rawBottom < 0 ? 0 : rawBottom
+  const carBottom = Math.max(0, currentIndex * FLOOR_HEIGHT + FLOOR_BASE_OFFSET + 10)
+
+  // [B] 텍스트용 (Realtime Value): 실시간 계산값(realtimeFloor)을 사용하여 숫자 갱신
+  const realtimeIndex = floorIndexFromBottom(realtimeFloor)
+  const realtimePx = Math.max(0, realtimeIndex * FLOOR_HEIGHT + FLOOR_BASE_OFFSET + 10)
+
 
   // --------------------------------------------------------
   // 4. 이벤트 핸들러 (승객 추가 / 하차 / 버튼 클릭)
@@ -115,7 +129,7 @@ function Dashboard() {
     }
   }
 
-  // ▼▼▼ [수정된 부분] 수동 하차 버튼 핸들러 ▼▼▼
+  // 수동 하차 버튼 핸들러
   const handleUnloadPassenger = (id) => {
     if (!doorLooksOpen) {
       alert("문이 열린 상태에서만 승객이 내릴 수 있습니다.")
@@ -125,7 +139,7 @@ function Dashboard() {
     const passengerToUnload = passengers.find((p) => p.id === id)
     if (!passengerToUnload || passengerToUnload.status !== "onboard") return
 
-    // 1. 화면상 승객 하차 처리 (상태 변경)
+    // 1. 화면상 승객 하차 처리
     setPassengers((prev) =>
       prev.map((p) =>
         p.id === id && p.status === "onboard"
@@ -134,47 +148,39 @@ function Dashboard() {
       )
     )
 
-    // 2. 큐 정리 로직 (하차한 승객의 목적지 층 삭제 여부 판단)
+    // 2. 큐 정리 (해당 층에 갈 다른 승객이 없다면 큐에서 제거)
     const destFloor = passengerToUnload.to
     
-    // 방금 내린 승객(id) 말고, "같은 층"으로 가려는 다른 승객이 있는지 확인
     const isStillNeeded = passengers.some(p => {
-       if (p.id === id) return false // 방금 내린 사람은 제외
-       if (p.status === "done") return false // 이미 내린 사람 제외
-       
-       // 탑승 중인데 목적지가 거기인 사람
+       if (p.id === id) return false 
+       if (p.status === "done") return false 
        if (p.status === "onboard" && p.to === destFloor) return true
-       // 대기 중인데 출발지가 거기인 사람 (태우러 가야 하니까)
        if (p.status === "waiting" && p.from === destFloor) return true
-       
        return false
     })
 
-    // 아무도 그 층을 원하지 않으면 큐에서 삭제 요청
     if (!isStillNeeded) {
         ctrl.removeRequest(destFloor)
     }
   }
-  // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
   // --------------------------------------------------------
-  // 5. [핵심] 문이 열렸을 때 탑승 및 하차 로직
+  // 5. 문이 열렸을 때 탑승 및 자동 하차 로직
   // --------------------------------------------------------
   useEffect(() => {
-    // 문이 활짝 열렸을 때만 수행
     if (doorState !== "open") return
 
     setPassengers((prev) => {
       const boardingTargets = []
       
       const updated = prev.map((p) => {
-        // [탑승 로직] 대기 중이고 현재 층이 출발지면 -> 탑승
+        // [탑승] 대기 중이고 현재 층이 출발지면 -> 탑승
         if (p.status === "waiting" && p.from === currentFloor) {
           boardingTargets.push(p.to)
           return { ...p, status: "onboard" }
         }
 
-        // [하차 로직] 탑승 중이고 현재 층이 목적지면 -> 하차 완료 (Done)
+        // [하차] 탑승 중이고 현재 층이 목적지면 -> 하차 완료
         if (p.status === "onboard" && p.to === currentFloor) {
           return { ...p, status: "done" }
         }
@@ -182,12 +188,12 @@ function Dashboard() {
         return p
       })
 
-      // 새로 탑승한 승객들이 목적지 버튼을 누름 -> Controller에 요청 (Car Call)
+      // 새로 탑승한 승객들이 목적지 버튼을 누름 -> Controller에 요청
       boardingTargets.forEach(floor => ctrl.requestFloor(floor))
       
       return updated
     })
-  }, [doorState, currentFloor, ctrl]) 
+  }, [doorState, currentFloor, ctrl])
 
   // --------------------------------------------------------
   // 6. UI 렌더링
@@ -222,13 +228,13 @@ function Dashboard() {
             <div className="door-indicator">
               <span className={`door-indicator-dot ${doorLooksOpen ? "open" : "closed"}`} />
               <span className="door-indicator-label">
-                문 {doorState === "opening" 
-                    ? "열리는 중" 
-                    : doorState === "closing" 
-                    ? "닫히는 중" 
-                    : doorLooksOpen 
-                    ? "열림" 
-                    : "닫힘"}
+                {doorState === "opening" 
+                  ? "열리는 중" 
+                  : doorState === "closing" 
+                  ? "닫히는 중" 
+                  : doorLooksOpen 
+                  ? "열림" 
+                  : "닫힘"}
               </span>
             </div>
             <div className="door-buttons">
@@ -449,7 +455,8 @@ function Dashboard() {
                     <td>현재 층</td><td>{currentFloor}</td><td>층</td><td>-</td>
                   </tr>
                   <tr>
-                    <td>카 위치</td><td>{carBottom.toFixed(1)}</td><td>px</td>
+                    {/* 실시간 위치 값 표시 */}
+                    <td>카 위치</td><td>{realtimePx.toFixed(1)}</td><td>px</td>
                     <td>{isMisaligned ? "정위치 실패" : "정상"}</td>
                   </tr>
                   <tr>

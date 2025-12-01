@@ -1,32 +1,26 @@
-import { useState, useEffect, useCallback, useMemo } from "react"; // useRef 제거
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { buildQueueWithLook } from "../logic/elevatorScheduler";
 
-// 상수 정의
 const TIME_PER_FLOOR = 2300;
 const DOOR_OPEN_TIME = 700;
 const DOOR_CLOSE_TIME = 700;
 const DOOR_DWELL_TIME = 2000;
 
 export function useElevatorController({ isOverload, hasJammedOnboard }) {
-  // --- 상태 관리 ---
   const [currentFloor, setCurrentFloor] = useState(1);
-  const [carFloor, setCarFloor] = useState(1);
+  const [carFloor, setCarFloor] = useState(1); // CSS 이동용 (목표값)
+  const [realtimeFloor, setRealtimeFloor] = useState(1); // [추가] 실시간 위치 표시용
   const [queue, setQueue] = useState([]);
   const [direction, setDirection] = useState("idle");
   const [doorState, setDoorState] = useState("closed");
   
-  // 모터/이동 관련
   const [moveDuration, setMoveDuration] = useState(0);
   const [misalignMode, setMisalignMode] = useState(false);
   const [isMisaligned, setIsMisaligned] = useState(false);
   const [speedFloorsPerSec, setSpeedFloorsPerSec] = useState(0);
   
-  // 화면상 이동 중인지 판별 (소수점 오차 고려)
   const isMoving = Math.abs(carFloor - currentFloor) > 0.01;
 
-
-
-  // --- 2. 층 호출 요청 (스케줄러 호출) ---
   const requestFloor = useCallback((floor) => {
     setQueue((prev) => {
       if (prev.includes(floor) || floor === currentFloor) return prev;
@@ -39,52 +33,34 @@ export function useElevatorController({ isOverload, hasJammedOnboard }) {
     });
   }, [currentFloor, direction]);
 
-  const removeRequest = useCallback((floor) =>{
-    setQueue((prev)=> prev.filter((f) => f !== floor));
+  const removeRequest = useCallback((floor) => {
+    setQueue((prev) => prev.filter((f) => f !== floor));
   }, []);
 
-  // --- 3. 모터 이동 제어 로직 (속도 처리 추가) ---
+  // --- 모터 이동 제어 ---
   useEffect(() => {
-    // 문이 닫혀있지 않으면 이동 불가
-    if (doorState !== "closed") {
+    if (doorState !== "closed" || queue.length === 0) {
       if (direction !== "idle") setDirection("idle");
-      setSpeedFloorsPerSec(0); // 정지 시 속도 0
+      setSpeedFloorsPerSec(0);
       return;
     }
-    // 갈 곳이 없으면 대기
-    if (queue.length === 0) {
-      if (direction !== "idle") setDirection("idle");
-      setSpeedFloorsPerSec(0); // 정지 시 속도 0
-      return;
-    }
-    
-    // 이미 이동 중이라면 재실행 방지
     if (isMoving) return;
 
     const target = queue[0];
-
-    // 이미 목표 층에 있다면
     if (target === currentFloor) {
       setDirection("idle");
       setSpeedFloorsPerSec(0);
       return;
     }
 
-    // --- 이동 시작 ---
+    // 이동 설정
     const distanceFloors = Math.abs(target - currentFloor);
-    const travelTime = TIME_PER_FLOOR * distanceFloors; // ms 단위
+    const travelTime = TIME_PER_FLOOR * distanceFloors;
 
     setMoveDuration(travelTime);
     setDirection(target > currentFloor ? "up" : "down");
 
-    // [추가] 이동 시작 시 속도 계산 및 설정 (층/초)
-    // 거리(층) / 시간(초)
-    if (travelTime > 0) {
-      const speed = distanceFloors / (travelTime / 1000);
-      setSpeedFloorsPerSec(speed);
-    }
-
-    // 정위치 실패 모드 시뮬레이션 계산
+    // 정위치 실패 계산
     let visualTargetFloor = target;
     if (misalignMode && !isMisaligned) {
       const OFFSET_RANGE = 0.4;
@@ -92,31 +68,65 @@ export function useElevatorController({ isOverload, hasJammedOnboard }) {
       let misFloor = target + offset;
       if (misFloor < 1) misFloor = 1;
       if (misFloor > 5) misFloor = 5;
-      
       visualTargetFloor = misFloor;
       setIsMisaligned(true);
     }
 
-    setCarFloor(visualTargetFloor);
+    setCarFloor(visualTargetFloor); // CSS 애니메이션 시작
 
-    // 도착 타이머 설정
-    const id = setTimeout(() => {
+    // ▼▼▼ 실시간 위치 & 속도 계산 루프 ▼▼▼
+    const startTime = performance.now();
+    const startPos = realtimeFloor; // 현재 실시간 위치에서 시작
+    const endPos = visualTargetFloor; // 목표 위치 (오차 포함)
+
+    const intervalId = setInterval(() => {
+      const now = performance.now();
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / travelTime, 1);
+
+      if (progress >= 1) {
+        setSpeedFloorsPerSec(0);
+        setRealtimeFloor(endPos); // 끝 위치로 정확히 맞춤
+        clearInterval(intervalId);
+        return;
+      }
+
+      // 1. 속도 계산 (Sin 파형)
+      const avgSpeed = distanceFloors / (travelTime / 1000);
+      const currentSpeed = avgSpeed * (Math.PI / 2) * Math.sin(Math.PI * progress);
+      setSpeedFloorsPerSec(currentSpeed);
+
+      // 2. [추가] 위치 계산 (Ease-in-out 공식 적용)
+      // CSS animation-timing-function: ease-in-out 과 유사한 수식
+      // 수식: -0.5 * (cos(PI * t) - 1)
+      const ease = -(Math.cos(Math.PI * progress) - 1) / 2;
+      const currentPos = startPos + (endPos - startPos) * ease;
+      setRealtimeFloor(currentPos);
+
+    }, 50);
+    // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+
+    const finishTimer = setTimeout(() => {
       setCurrentFloor(target);
-      setSpeedFloorsPerSec(0); // [추가] 도착하면 속도 0으로 초기화
+      setSpeedFloorsPerSec(0);
+      setRealtimeFloor(visualTargetFloor); // 확실하게 최종 위치로
       if (misalignMode) setMisalignMode(false);
+      clearInterval(intervalId);
     }, travelTime);
 
-    return () => clearTimeout(id);
-    
+    return () => {
+      clearTimeout(finishTimer);
+      clearInterval(intervalId);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [queue, currentFloor, doorState]); 
 
-  // --- 4. 도착 후 자동 문 열림 ---
+  // --- 자동 문 열림 ---
   useEffect(() => {
     if (doorState !== "closed") return;
     if (queue.length === 0) return;
     if (isMoving) return;
-    if (isMisaligned) return; 
+    if (isMisaligned) return;
 
     const target = queue[0];
     if (target === currentFloor && Math.abs(carFloor - currentFloor) < 0.1) {
@@ -124,7 +134,7 @@ export function useElevatorController({ isOverload, hasJammedOnboard }) {
     }
   }, [doorState, queue, currentFloor, carFloor, isMoving, isMisaligned]);
 
-  // --- 5. 문 상태 타이머 & 안전 장치 ---
+  // --- 문 상태 타이머 ---
   useEffect(() => {
     let timerId;
     if (doorState === "opening") {
@@ -135,7 +145,6 @@ export function useElevatorController({ isOverload, hasJammedOnboard }) {
       }
     } else if (doorState === "closing") {
       if (hasJammedOnboard) {
-        // 끼임 발생 시 닫히지 않음
       } else {
         timerId = setTimeout(() => {
           setDoorState("closed");
@@ -146,7 +155,6 @@ export function useElevatorController({ isOverload, hasJammedOnboard }) {
     return () => clearTimeout(timerId);
   }, [doorState, currentFloor, isOverload, hasJammedOnboard]);
 
-  // --- Action Handlers ---
   const openDoor = useCallback(() => {
     if (doorState === "open" || doorState === "opening" || isMoving) return;
     setDoorState("opening");
@@ -168,29 +176,55 @@ export function useElevatorController({ isOverload, hasJammedOnboard }) {
     
     setMoveDuration(time);
     setCarFloor(nearest);
-    
-    // 수정 이동 시작 시 속도 표시
+
     if (time > 0) {
+        const startTime = performance.now();
+        const startPos = realtimeFloor;
         const dist = Math.abs(nearest - carFloor);
-        setSpeedFloorsPerSec(dist / (time/1000));
-    }
+        
+        const fixInterval = setInterval(() => {
+            const now = performance.now();
+            const elapsed = now - startTime;
+            const progress = Math.min(elapsed / time, 1);
+            
+            if (progress >= 1) {
+                setSpeedFloorsPerSec(0);
+                setRealtimeFloor(nearest);
+                clearInterval(fixInterval);
+                return;
+            }
 
-    const finishFix = () => {
-        setCurrentFloor(nearest);
-        setIsMisaligned(false);
-        setSpeedFloorsPerSec(0); // 완료 시 속도 0
-    };
+            // 속도
+            const avgSpeed = dist / (time / 1000);
+            const currentSpeed = avgSpeed * (Math.PI / 2) * Math.sin(Math.PI * progress);
+            setSpeedFloorsPerSec(currentSpeed);
+            
+            // 위치
+            const ease = -(Math.cos(Math.PI * progress) - 1) / 2;
+            const currentPos = startPos + (nearest - startPos) * ease;
+            setRealtimeFloor(currentPos);
 
-    if(time > 0) {
-      setTimeout(finishFix, time);
+        }, 50);
+
+        setTimeout(() => {
+            setCurrentFloor(nearest);
+            setIsMisaligned(false);
+            setSpeedFloorsPerSec(0);
+            setRealtimeFloor(nearest);
+            clearInterval(fixInterval);
+        }, time);
     } else {
-      finishFix();
+        setCurrentFloor(nearest);
+        setRealtimeFloor(nearest);
+        setIsMisaligned(false);
+        setSpeedFloorsPerSec(0);
     }
-  }, [isMisaligned, carFloor]);
+  }, [isMisaligned, carFloor, realtimeFloor]);
 
   return useMemo(() => ({
     currentFloor,
     carFloor,
+    realtimeFloor, // [추가] 외부로 내보냄
     queue,
     direction,
     doorState,
@@ -206,8 +240,8 @@ export function useElevatorController({ isOverload, hasJammedOnboard }) {
     setMisalignMode,
     fixMisalign,
   }), [
-    currentFloor, carFloor, queue, direction, doorState, isMoving, 
+    currentFloor, carFloor, realtimeFloor, queue, direction, doorState, isMoving, 
     moveDuration, speedFloorsPerSec, isMisaligned, 
-    requestFloor, openDoor, closeDoor, fixMisalign
+    requestFloor, removeRequest, openDoor, closeDoor, fixMisalign
   ]);
 }
