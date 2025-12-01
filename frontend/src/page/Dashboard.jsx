@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react"
 import "./Dashboard.css"
 import { useElevatorController } from "../hooks/useElevatorController"
+import { useElevatorNetwork } from "../hooks/useElevatorNetwork"
 
 const FLOORS = [5, 4, 3, 2, 1]
 const FLOOR_HEIGHT = 110
@@ -35,6 +36,19 @@ function Dashboard() {
     isOverload,
     hasJammedOnboard,
   })
+
+  const elevatorState = {
+    currentFloor: ctrl.currentFloor,
+    realtimeFloor: ctrl.realtimeFloor, // 실시간 위치
+    speedFloorsPerSec: ctrl.speedFloorsPerSec,
+    doorState: ctrl.doorState,
+    direction: ctrl.direction,
+    isOverload,        // Dashboard에서 계산된 값
+    hasJammedOnboard,  // Dashboard에서 계산된 값
+  }
+
+  // ▼▼▼ [추가] 여기서 백엔드로 자동 전송 시작! ▼▼▼
+  const { isConnected } = useElevatorNetwork(elevatorState)
 
   const { 
     currentFloor, // (논리적 층 - 도착해야 바뀜)
@@ -183,6 +197,9 @@ function Dashboard() {
         <div className="dash-header-main">
           <div>
             <h1>CPS Elevator Simulator</h1>
+            <span style={{ fontSize: "0.8rem", color: isConnected ? "green" : "red" }}>
+               {isConnected ? "● Online" : "○ Offline"}
+             </span>
             <p>
               {/* ▼▼▼ [수정] currentFloor 대신 displayFloor 사용 ▼▼▼ */}
               현재 층: <b>{displayFloor}</b> <span style={{ color: statusColor }}>({statusLabel})</span>
