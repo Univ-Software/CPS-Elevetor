@@ -443,7 +443,7 @@ function Dashboard() {
 
           <div className="backend-grid">
             <div className="backend-card">
-              <h3>실시간 센서 값 (예시)</h3>
+              <h3>실시간 센서 값</h3>
               <table className="backend-table">
                 <thead>
                   <tr>
