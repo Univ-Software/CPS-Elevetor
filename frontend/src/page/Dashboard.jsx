@@ -364,6 +364,65 @@ function Dashboard() {
             </div>
           </div>
         </div>
+        {/* [오른쪽] 위험 판단 행렬 (Risk Assessment Matrix) */}
+            <div className="backend-card">
+              <h3>🛡️ 자율 제어 위험 판단 행렬</h3>
+              
+              {/* 행렬 계산 로직 */}
+              {(() => {
+                // 1. 위험 요소 벡터 생성 (조건이 맞으면 1, 아니면 0)
+                // 개문발차(OpenMove): 문이 열려있는데(open/opening) 속도가 0.1 이상인 경우
+                const isOpenMoving = (doorState.includes("open") && Math.abs(speedFloorsPerSec) > 0.1);
+
+                const riskVector = [
+                  { id: "MISALIGN", label: "정위치오차", value: isMisaligned ? 1 : 0 },
+                  { id: "OVERLOAD", label: "과부하",    value: isOverload ? 1 : 0 },
+                  { id: "JAMMING",  label: "문 끼임",   value: hasJammedOnboard ? 1 : 0 },
+                  { id: "OPENMOVE", label: "개문발차",  value: isOpenMoving ? 1 : 0 },
+                ];
+
+                // 2. 위험 점수 합산 (Sigma)
+                const totalScore = riskVector.reduce((acc, curr) => acc + curr.value, 0);
+
+                // 3. 최종 판정 로직
+                let statusLevel = "NORMAL";
+                let statusText = "정상 운행 (Normal)";
+                
+                if (totalScore >= 2) {
+                  statusLevel = "CRITICAL";
+                  statusText = "🚨 비상 정지 (Emergency Stop)";
+                } else if (totalScore === 1) {
+                  statusLevel = "WARNING";
+                  statusText = "⚠️ 주의/감속 (Warning)";
+                }
+
+                return (
+                  <div className="matrix-container">
+                    {/* 상단: 입력 벡터 (0 / 1 표시) */}
+                    <div className="matrix-row inputs">
+                      {riskVector.map((item) => (
+                        <div key={item.id} className={`matrix-cell ${item.value === 1 ? "active" : ""}`}>
+                          <span className="matrix-label">{item.label}</span>
+                          <span className="matrix-bit">{item.value}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* 연결 연산자 (화살표 or 수식 느낌) */}
+                    <div className="matrix-operator">
+                      <span>∑ (Sum) = {totalScore}</span>
+                      <span className="arrow">⬇</span>
+                    </div>
+
+                    {/* 하단: 최종 판정 결과 */}
+                    <div className={`matrix-result ${statusLevel}`}>
+                      <div className="result-title">System Decision</div>
+                      <div className="result-value">{statusText}</div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
       </section>
       
       <footer className="dash-footer">© 2025 CPS Elevator System</footer>

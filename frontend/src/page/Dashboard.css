@@ -636,3 +636,127 @@ body {
   color: #94a3b8;
   font-size: 0.85rem;
 }
+
+/* src/page/Dashboard.css 맨 아래 추가 */
+
+/* === 위험 판단 행렬 스타일 === */
+.matrix-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 10px 0;
+}
+
+/* 1. 입력 벡터 (가로 나열) */
+.matrix-row.inputs {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.matrix-cell {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px 4px;
+  transition: all 0.3s ease;
+}
+
+.matrix-label {
+  font-size: 0.75rem;
+  color: #64748b;
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+.matrix-bit {
+  font-family: 'Menlo', 'Courier New', monospace; /* 코딩 폰트 */
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: #cbd5e1; /* 꺼진 상태 (회색) */
+  line-height: 1;
+}
+
+/* 활성화(1) 상태 스타일 */
+.matrix-cell.active {
+  background: #fef2f2;
+  border-color: #fca5a5;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15);
+}
+
+.matrix-cell.active .matrix-label {
+  color: #b91c1c;
+}
+
+.matrix-cell.active .matrix-bit {
+  color: #ef4444; /* 켜진 상태 (빨강) */
+  text-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
+}
+
+/* 2. 연산자 (중간) */
+.matrix-operator {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 12px;
+  font-size: 0.85rem;
+  color: #64748b;
+  font-family: monospace;
+  font-weight: 700;
+}
+
+/* 3. 최종 결과 박스 */
+.matrix-result {
+  text-align: center;
+  padding: 16px;
+  border-radius: 12px;
+  color: white;
+  transition: background 0.3s;
+}
+
+.result-title {
+  font-size: 0.75rem;
+  opacity: 0.8;
+  margin-bottom: 4px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.result-value {
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+
+/* 상태별 색상 */
+.matrix-result.NORMAL {
+  background: linear-gradient(135deg, #22c55e, #15803d);
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.2);
+}
+
+.matrix-result.WARNING {
+  background: linear-gradient(135deg, #f59e0b, #b45309);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2);
+  animation: pulseWarning 2s infinite;
+}
+
+.matrix-result.CRITICAL {
+  background: linear-gradient(135deg, #ef4444, #b91c1c);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+  animation: pulseCritical 0.8s infinite;
+}
+
+@keyframes pulseWarning {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+  100% { transform: scale(1); }
+}
+
+@keyframes pulseCritical {
+  0% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.85; transform: scale(1.02); }
+  100% { opacity: 1; transform: scale(1); }
+}
