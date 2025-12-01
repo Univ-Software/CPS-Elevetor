@@ -20,6 +20,18 @@ function Dashboard() {
   
   // [추가] 백엔드 명령 로그 표시용 상태
   const [lastCommand, setLastCommand] = useState(null)
+  // 누적 로그 항목 (최신 항목이 앞에 오도록 관리)
+  const [logEntries, setLogEntries] = useState([
+    { timestamp: new Date().toISOString(), level: 'INFO', message: '시스템 시작' }
+  ])
+
+  const addLogEntry = useCallback((entry) => {
+    setLogEntries(prev => {
+      const next = [entry, ...prev]
+      // 최대 200개까지만 보관
+      return next.slice(0, 200)
+    })
+  }, [])
 
   const visiblePassengers = passengers.filter((p) => p.status !== "done")
   const onboardPassengers = passengers.filter((p) => p.status === "onboard")
@@ -38,7 +50,9 @@ function Dashboard() {
   // ▼▼▼ [추가] 백엔드 명령 처리 핸들러 ▼▼▼
   const handleBackendCommand = useCallback((command) => {
     // 로그에 표시
-    setLastCommand(`[CMD] ${command.type}: ${command.message || ''}`);
+    const msg = `[CMD] ${command.type}: ${command.message || ''}`;
+    setLastCommand(msg);
+    addLogEntry({ timestamp: new Date().toISOString(), level: 'CMD', message: msg })
 
     switch (command.type) {
       case "FIX_ALIGNMENT": // 백엔드에서 이 타입을 보내면 실행
@@ -57,7 +71,7 @@ function Dashboard() {
       default:
         console.log("Unknown command:", command);
     }
-  }, [ctrl]); 
+  }, [ctrl, addLogEntry]); 
   // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
   // 2. 네트워크 훅 연결 (상태 전송 + 명령 수신 핸들러 전달)
@@ -164,6 +178,25 @@ function Dashboard() {
       return updated
     })
   }, [doorState, currentFloor, ctrl])
+
+  // 상태 변화 시 로그 추가 (중복 방지를 위해 true로 변할 때만 누적)
+  useEffect(() => {
+    if (isMisaligned) {
+      addLogEntry({ timestamp: new Date().toISOString(), level: 'WARN', message: '[WARN] 정위치 정차 실패 감지' })
+    }
+  }, [isMisaligned])
+
+  useEffect(() => {
+    if (isOverload) {
+      addLogEntry({ timestamp: new Date().toISOString(), level: 'ALERT', message: '[ALERT] 과부하 알림 (500kg 초과)' })
+    }
+  }, [isOverload])
+
+  useEffect(() => {
+    if (hasJammedOnboard) {
+      addLogEntry({ timestamp: new Date().toISOString(), level: 'ALERT', message: '[ALERT] 문 끼임 승객 감지' })
+    }
+  }, [hasJammedOnboard])
 
   const statusLabel = direction === "idle" ? "대기" : direction === "up" ? "상행" : "하행"
   const statusColor = direction === "idle" ? "#6b7280" : direction === "up" ? "#2563eb" : "#dc2626"
@@ -315,13 +348,18 @@ function Dashboard() {
               <h3>백엔드 이벤트 / 알람 로그</h3>
               <p className="backend-log-hint">로그 표시 영역</p>
               <div className="backend-log-list">
-                <div className="backend-log-item">[INFO] 시스템 시작</div>
-                {/* ▼▼▼ [추가] 백엔드 명령 수신 시 로그 표시 ▼▼▼ */}
-                {lastCommand && <div className="backend-log-item" style={{color: '#3b82f6'}}>{lastCommand}</div>}
-                
-                {isMisaligned && <div className="backend-log-item">[WARN] 정위치 정차 실패 감지</div>}
-                {isOverload && <div className="backend-log-item">[ALERT] 과부하 알림 (500kg 초과)</div>}
-                {hasJammedOnboard && <div className="backend-log-item">[ALERT] 문 끼임 승객 감지</div>}
+                {logEntries.length === 0 ? (
+                  <div className="backend-log-item">[INFO] 로그가 없습니다</div>
+                ) : (
+                  logEntries.map((entry) => {
+                    const color = entry.level === 'ALERT' ? '#dc2626' : entry.level === 'WARN' ? '#f59e0b' : entry.level === 'CMD' ? '#3b82f6' : undefined
+                    return (
+                      <div key={entry.timestamp + entry.message} className="backend-log-item" style={{ color }}>
+                        [{new Date(entry.timestamp).toLocaleTimeString()}] [{entry.level}] {entry.message}
+                      </div>
+                    )
+                  })
+                )}
               </div>
             </div>
           </div>
