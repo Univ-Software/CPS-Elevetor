@@ -4,24 +4,48 @@ import { Client } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
 
 // 백엔드로 보낼 주기 (ms) - 0.1초마다 전송
-const SEND_INTERVAL = 100; 
+const SEND_INTERVAL = 100;
 
 export function useElevatorNetwork(elevatorState) {
   const [isConnected, setIsConnected] = useState(false);
+  const [lastResponse, setLastResponse] = useState(null);
   const clientRef = useRef(null);
 
   // 1. 웹소켓 연결 설정
   useEffect(() => {
-    const socket = new SockJS("http://localhost:8080/ws"); // 백엔드 주소 확인 필요
+    // Connect through nginx proxy (http://localhost/ws) when in Docker
+    // For local development, use backend directly (http://localhost:8088/ws)
+    const wsUrl = process.env.NODE_ENV === 'production'
+      ? "http://localhost/ws"
+      : "http://localhost:8088/ws";
+
+    const socket = new SockJS(wsUrl);
     const client = new Client({
       webSocketFactory: () => socket,
       reconnectDelay: 5000, // 끊기면 5초 뒤 재연결 시도
       onConnect: () => {
         console.log("✅ Backend Connected!");
         setIsConnected(true);
-        
-        // (옵션) 백엔드에서 오는 제어 명령 구독
-        // client.subscribe("/topic/control", (msg) => { ... });
+
+        // Subscribe to sensor data responses from backend
+        client.subscribe("/topic/sensor-response", (message) => {
+          try {
+            const response = JSON.parse(message.body);
+            console.log("📥 Received analysis:", response);
+            setLastResponse(response);
+
+            // Log danger level with appropriate styling
+            if (response.dangerLevel === "CRITICAL") {
+              console.error("🚨 CRITICAL:", response.analysisMessage);
+            } else if (response.dangerLevel === "WATCH") {
+              console.warn("⚠️ WATCH:", response.analysisMessage);
+            } else {
+              console.log("✓", response.analysisMessage);
+            }
+          } catch (err) {
+            console.error("Failed to parse response:", err);
+          }
+        });
       },
       onStompError: (frame) => {
         console.error("❌ STOMP Error", frame);
@@ -71,5 +95,5 @@ export function useElevatorNetwork(elevatorState) {
     return () => clearInterval(intervalId);
   }, [isConnected, elevatorState]); // elevatorState가 최신 상태일 때만 갱신
 
-  return { isConnected };
+  return { isConnected, lastResponse };
 }
