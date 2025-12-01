@@ -27,7 +27,14 @@ function Dashboard() {
 
   const addLogEntry = useCallback((entry) => {
     setLogEntries(prev => {
-      const next = [entry, ...prev]
+      // 중복 연속 항목 처리: 최신 항목과 level+message가 같으면 카운트 증가
+      const latest = prev[0]
+      if (latest && latest.level === entry.level && latest.message === entry.message) {
+        const updated = [{ ...latest, timestamp: entry.timestamp, count: (latest.count || 1) + 1 }, ...prev.slice(1)]
+        return updated.slice(0, 200)
+      }
+
+      const next = [{ ...entry, count: 1 }, ...prev]
       // 최대 200개까지만 보관
       return next.slice(0, 200)
     })
@@ -356,6 +363,7 @@ function Dashboard() {
                     return (
                       <div key={entry.timestamp + entry.message} className="backend-log-item" style={{ color }}>
                         [{new Date(entry.timestamp).toLocaleTimeString()}] [{entry.level}] {entry.message}
+                        {entry.count && entry.count > 1 ? ` (×${entry.count})` : ''}
                       </div>
                     )
                   })
