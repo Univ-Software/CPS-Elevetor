@@ -778,3 +778,68 @@ body {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.6; }
 }
+
+/* src/page/Dashboard.css 맨 아래 추가 */
+
+/* === 데이터 검증 테이블 스타일 === */
+.comparison-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.comparison-table th {
+  background: #f1f5f9;
+  color: #64748b;
+  font-weight: 700;
+  padding: 12px;
+  text-align: center;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.comparison-table td {
+  padding: 12px;
+  text-align: center;
+  border-bottom: 1px solid #f1f5f9;
+  font-family: 'Menlo', monospace;
+}
+
+/* 항목 이름 */
+.comp-label {
+  font-weight: 700;
+  color: #334155;
+  background: #f8fafc;
+  width: 150px;
+}
+
+/* 값 표시 (Safe / Danger) */
+.val-safe { color: #10b981; font-weight: 600; }
+.val-danger { color: #ef4444; font-weight: 700; background: #fef2f2; }
+
+/* 진단 결과 뱃지 */
+.comp-result {
+  font-weight: 800;
+  border-radius: 6px;
+}
+
+.status-ok {
+  color: #10b981;
+}
+
+.status-fp {
+  color: #b45309;
+  background-color: #fffbeb;
+  border: 1px solid #fcd34d;
+  animation: pulseWarning 2s infinite;
+}
+
+.status-fn {
+  color: #b91c1c;
+  background-color: #fef2f2;
+  border: 1px solid #fca5a5;
+  animation: pulseCritical 1s infinite;
+}

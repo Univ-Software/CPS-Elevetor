@@ -13,21 +13,25 @@ const MIN_WEIGHT_KG = 20
 const MAX_WEIGHT_KG = 110
 
 function Dashboard() {
+  // --- 1. 기본 상태 관리 ---
   const [passengers, setPassengers] = useState([])
   const [spawnFloor, setSpawnFloor] = useState(1)
   const [targetFloor, setTargetFloor] = useState(5)
   const [nextPassengerId, setNextPassengerId] = useState(1)
   
-  // 백엔드 명령 로그 표시용
+  // [NEW] 에러 주입 모드 (NONE, FP:오탐, FN:미탐)
+  const [errorInjectionMode, setErrorInjectionMode] = useState("NONE");
+
+  // 백엔드 로그 및 명령 상태
   const [lastCommand, setLastCommand] = useState(null)
   const [logEntries, setLogEntries] = useState([
-    { timestamp: new Date().toISOString(), level: 'INFO', message: '시스템 시작' }
+    { timestamp: new Date().toISOString(), level: 'INFO', message: '시스템 시작 - 모니터링 대기 중' }
   ])
 
-  // 정위치 오차 지속 시간 (ms) & 로그 중복 방지 Ref
+  // 정위치 오차 시간 측정용 Ref & 로그 중복 방지 Ref
   const [misalignWaitTime, setMisalignWaitTime] = useState(0);
   const misalignStartRef = useRef(null);
-  const misalignLoggedRef = useRef(false); // [최적화] 로그 중복 방지
+  const misalignLoggedRef = useRef(false);
 
   // 로그 추가 함수 (최신순 유지, 최대 200개)
   const addLogEntry = useCallback((entry) => {
@@ -37,21 +41,24 @@ function Dashboard() {
     })
   }, [])
 
+  // 승객 필터링
   const visiblePassengers = passengers.filter((p) => p.status !== "done")
   const onboardPassengers = passengers.filter((p) => p.status === "onboard")
   
   const onboardCount = onboardPassengers.length
   const onboardWeightKg = onboardPassengers.reduce((sum, p) => sum + (p.weightKg ?? 0), 0)
+  
+  // 물리적 상태 (Ground Truth)
   const isOverload = onboardWeightKg > MAX_LOAD_KG
   const hasJammedOnboard = onboardPassengers.some((p) => p.isJammed)
 
-  // 1. 컨트롤러 사용
+  // --- 2. 컨트롤러 연결 ---
   const ctrl = useElevatorController({
     isOverload,
     hasJammedOnboard,
   })
 
-  // 백엔드 명령 처리
+  // 백엔드 명령 처리 핸들러
   const handleBackendCommand = useCallback((command) => {
     const msg = `[CMD] ${command.type}: ${command.message || ''}`;
     setLastCommand(msg);
@@ -61,6 +68,7 @@ function Dashboard() {
       case "FIX_ALIGNMENT":
         if (ctrl.isMisaligned) {
             ctrl.fixMisalign();
+            addLogEntry({ timestamp: new Date().toISOString(), level: 'INFO', message: '원격 정위치 수정 명령 실행 완료' });
         } else {
             console.log("이미 정위치 상태입니다.");
         }
@@ -75,7 +83,7 @@ function Dashboard() {
     }
   }, [ctrl, addLogEntry]); 
 
-  // 2. 네트워크 연결
+  // --- 3. 네트워크 연결 ---
   const elevatorState = {
     currentFloor: ctrl.currentFloor,
     realtimeFloor: ctrl.realtimeFloor,
@@ -95,7 +103,7 @@ function Dashboard() {
 
   const doorLooksOpen = doorState === "open" || doorState === "opening"
 
-  // 3. 화면 렌더링용 계산
+  // --- 4. 화면 렌더링용 계산 ---
   const floorIndexFromBottom = (f) => f - 1
   const currentIndex = floorIndexFromBottom(carFloor)
   const carBottom = Math.max(0, currentIndex * FLOOR_HEIGHT + FLOOR_BASE_OFFSET + 10)
@@ -105,7 +113,7 @@ function Dashboard() {
   const displayFloor = Math.round(realtimeFloor)
 
   // ----------------------------------------------------------------
-  // [수정] 정위치 오차 시간 측정 (Interval 사용)
+  // [로직] 정위치 오차 시간 측정 (Interval 사용)
   // ----------------------------------------------------------------
   useEffect(() => {
     const isStopped = Math.abs(speedFloorsPerSec) <= 0.01;
@@ -129,7 +137,7 @@ function Dashboard() {
     } else {
         misalignStartRef.current = null;
         setMisalignWaitTime(0);
-        // 상태가 정상이 되면 로그 플래그 초기화
+        // 상태가 정상으로 돌아오면 로그 플래그 초기화
         misalignLoggedRef.current = false;
     }
 
@@ -139,7 +147,7 @@ function Dashboard() {
   }, [speedFloorsPerSec, realtimeFloor]);
 
 
-  // 4. 이벤트 핸들러
+  // --- 5. 이벤트 핸들러 ---
   const handleAddPassenger = (e) => {
     e.preventDefault()
     if (spawnFloor === targetFloor) return alert("출발/목적층이 같습니다.")
@@ -196,7 +204,9 @@ function Dashboard() {
     if (!isStillNeeded) ctrl.removeRequest(destFloor)
   }
 
-  // 문 열림 시 탑승/하차 (정위치 실패 시 탑승 차단)
+  // --- 6. Effects (탑승 및 로그) ---
+  
+  // 문 열림 시 탑승/하차 (정위치 실패 시 차단)
   useEffect(() => {
     if (doorState !== "open" || isMisaligned) return 
 
@@ -217,24 +227,24 @@ function Dashboard() {
     })
   }, [doorState, currentFloor, ctrl, isMisaligned])
 
-  // 로그 자동 추가 (도배 방지 로직 적용)
+  // 로그 자동 추가 (도배 방지 최적화)
   useEffect(() => {
     // 2초가 지났고 && 아직 로그를 안 찍었을 때만 실행
     if (isMisaligned && misalignWaitTime > 2000 && !misalignLoggedRef.current) {
-      addLogEntry({ timestamp: new Date().toISOString(), level: 'WARN', message: '정위치 정차 실패 (2초 경과 - 위험 감지)' })
-      misalignLoggedRef.current = true; // 로그 찍음 표시
+      addLogEntry({ timestamp: new Date().toISOString(), level: 'WARN', message: '[WARN] 정위치 정차 실패 (2초 경과 - 위험 확정)' })
+      misalignLoggedRef.current = true; // 플래그 잠금
     }
   }, [isMisaligned, misalignWaitTime, addLogEntry])
 
   useEffect(() => {
     if (isOverload) {
-      addLogEntry({ timestamp: new Date().toISOString(), level: 'ALERT', message: '과부하 알림 (500kg 초과)' })
+      addLogEntry({ timestamp: new Date().toISOString(), level: 'ALERT', message: '[ALERT] 과부하 알림 (500kg 초과)' })
     }
   }, [isOverload, addLogEntry])
 
   useEffect(() => {
     if (hasJammedOnboard) {
-      addLogEntry({ timestamp: new Date().toISOString(), level: 'ALERT', message: '문 끼임 승객 감지' })
+      addLogEntry({ timestamp: new Date().toISOString(), level: 'ALERT', message: '[ALERT] 문 끼임 승객 감지' })
     }
   }, [hasJammedOnboard, addLogEntry])
 
@@ -293,6 +303,28 @@ function Dashboard() {
             <button className="level-error-btn" onClick={() => ctrl.setMisalignMode(true)}>다음 정차 시 정위치 실패 발생</button>
             <button className="level-fix-btn" onClick={ctrl.fixMisalign} disabled={!isMisaligned}>정위치 자동 수정</button>
             <p className="level-hint">정위치 실패 모드를 켜면 1~5층 랜덤 위치에 정차하고 문이 열리지 않습니다. "자동 수정"으로 해결하세요.</p>
+          </div>
+
+          {/* [NEW] 오탐/미탐 테스트 버튼 섹션 */}
+          <div className="error-test-section" style={{marginTop: '20px', borderTop: '1px dashed #e2e8f0', paddingTop: '16px'}}>
+            <h3 style={{fontSize:'0.95rem', color:'#475569', marginBottom:'8px'}}>🧪 센서 신뢰성 평가 (Injection)</h3>
+            <div style={{display:'flex', gap:'8px', flexDirection:'column'}}>
+              <button 
+                className={`floor-btn ${errorInjectionMode === "FP" ? "inside" : ""}`}
+                onClick={() => setErrorInjectionMode(prev => prev === "FP" ? "NONE" : "FP")}
+                style={errorInjectionMode === "FP" ? {borderColor: '#f59e0b', color: '#b45309', background:'#fffbeb'} : {}}
+              >
+                {errorInjectionMode === "FP" ? "⚠️ 오탐(FP) 테스트 중..." : "오탐(FP) 유발 (센서 노이즈)"}
+              </button>
+              
+              <button 
+                className={`floor-btn ${errorInjectionMode === "FN" ? "inside" : ""}`}
+                onClick={() => setErrorInjectionMode(prev => prev === "FN" ? "NONE" : "FN")}
+                style={errorInjectionMode === "FN" ? {borderColor: '#ef4444', color: '#b91c1c', background:'#fef2f2'} : {}}
+              >
+                {errorInjectionMode === "FN" ? "🚨 미탐(FN) 테스트 중..." : "미탐(FN) 유발 (센서 고장)"}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -371,144 +403,206 @@ function Dashboard() {
             <p className="backend-subtitle">엘리베이터 상태를 백엔드와 주고받는 영역입니다.</p>
           </div>
           <div className="backend-grid">
-            <div className="backend-card">
-              <h3>실시간 센서 값</h3>
-              <table className="backend-table">
-                <thead><tr><th>항목</th><th>값</th><th>단위</th><th>상태</th></tr></thead>
-                <tbody>
-                  <tr><td>현재 층</td><td>{displayFloor}</td><td>층</td><td>-</td></tr>
-                  <tr><td>카 위치</td><td>{realtimePx.toFixed(1)}</td><td>px</td><td>{isMisaligned ? "정위치 실패" : "정상"}</td></tr>
-                  <tr><td>속도</td><td>{speedFloorsPerSec.toFixed(2)}</td><td>층/초</td><td>{isMoving ? "이동 중" : "정지"}</td></tr>
-                  <tr><td>문 상태</td><td>{doorState}</td><td>-</td><td>{hasJammedOnboard ? "끼임 감지" : "정상"}</td></tr>
-                  <tr><td>적재량</td><td>{onboardWeightKg}</td><td>kg</td><td>{isOverload ? "과부하" : "정상"}</td></tr>
-                </tbody>
-              </table>
+            {/* 왼쪽 카드: 실시간 센서값 + 로그 */}
+            <div style={{display:'flex', flexDirection:'column', gap:'24px'}}>
+                <div className="backend-card">
+                <h3>실시간 센서 값</h3>
+                <table className="backend-table">
+                    <thead><tr><th>항목</th><th>값</th><th>단위</th><th>상태</th></tr></thead>
+                    <tbody>
+                    <tr><td>현재 층</td><td>{displayFloor}</td><td>층</td><td>-</td></tr>
+                    <tr><td>카 위치</td><td>{realtimePx.toFixed(1)}</td><td>px</td><td>{isMisaligned ? "정위치 실패" : "정상"}</td></tr>
+                    <tr><td>속도</td><td>{speedFloorsPerSec.toFixed(2)}</td><td>층/초</td><td>{isMoving ? "이동 중" : "정지"}</td></tr>
+                    <tr><td>문 상태</td><td>{doorState}</td><td>-</td><td>{hasJammedOnboard ? "끼임 감지" : "정상"}</td></tr>
+                    <tr><td>적재량</td><td>{onboardWeightKg}</td><td>kg</td><td>{isOverload ? "과부하" : "정상"}</td></tr>
+                    </tbody>
+                </table>
+                </div>
+                
+                <div className="backend-card backend-log">
+                <h3>백엔드 이벤트 / 알람 로그</h3>
+                <p className="backend-log-hint">최대 200개까지 표시됩니다.</p>
+                <div className="backend-log-list">
+                    {logEntries.length === 0 ? (
+                    <div className="backend-log-item">[INFO] 로그가 없습니다</div>
+                    ) : (
+                    logEntries.map((entry, idx) => {
+                        const color = entry.level === 'ALERT' ? '#dc2626' : entry.level === 'WARN' ? '#f59e0b' : entry.level === 'CMD' ? '#3b82f6' : undefined
+                        return (
+                        <div key={idx} className="backend-log-item" style={{ color }}>
+                            [{new Date(entry.timestamp).toLocaleTimeString()}] [{entry.level}] {entry.message}
+                        </div>
+                        )
+                    })
+                    )}
+                </div>
+                </div>
             </div>
-            
-            <div className="backend-card backend-log">
-              <h3>백엔드 이벤트 / 알람 로그</h3>
-              <p className="backend-log-hint">로그 표시 영역</p>
-              <div className="backend-log-list">
-                {logEntries.length === 0 ? (
-                  <div className="backend-log-item">[INFO] 로그가 없습니다</div>
-                ) : (
-                  logEntries.map((entry) => {
-                    const color = entry.level === 'ALERT' ? '#dc2626' : entry.level === 'WARN' ? '#f59e0b' : entry.level === 'CMD' ? '#3b82f6' : undefined
-                    return (
-                      <div key={entry.timestamp + entry.message} className="backend-log-item" style={{ color }}>
-                        [{new Date(entry.timestamp).toLocaleTimeString()}] [{entry.level}] {entry.message}
-                      </div>
-                    )
-                  })
-                )}
-              </div>
+
+            {/* 오른쪽 카드: 안전 행렬 + 검증 테이블 */}
+            <div style={{display:'flex', flexDirection:'column', gap:'24px'}}>
+                {/* 1. 안전 제어 행렬 (Safety Matrix) */}
+                <div className="backend-card">
+                    <h3>🛡️ 자율 제어 센서 분석 행렬</h3>
+                    
+                    {(() => {
+                        // --- [1] 물리적 진실 (Ground Truth) ---
+                        const real_DoorObj   = hasJammedOnboard;
+                        const real_Overload  = isOverload;
+                        
+                        // --- [2] 센서 값 (Sensor Data - 에러 주입 적용) ---
+                        let s_DoorObj   = real_DoorObj ? 1 : 0;
+                        let s_Overload  = real_Overload ? 1 : 0;
+
+                        // 에러 주입: 센서 값을 조작함
+                        if (errorInjectionMode === "FP") {
+                            if (!real_DoorObj) s_DoorObj = 1; // 오탐: 실제론 없는데 있다고 함
+                        }
+                        if (errorInjectionMode === "FN") {
+                            if (real_Overload) s_Overload = 0; // 미탐: 실제론 과부하인데 없다고 함
+                        }
+
+                        // 기타 센서들 (정상)
+                        const isPosError  = Math.abs(realtimeFloor - Math.round(realtimeFloor)) > 0.1 ? 1 : 0;
+                        const isMotorRun  = (Math.abs(speedFloorsPerSec) > 0.01 || direction !== "idle") ? 1 : 0;
+                        const s_DoorClose = (doorState === "closing" || doorState === "closed") ? 1 : 0;
+                        const isWaitOver  = misalignWaitTime > 2000 ? 1 : 0;
+
+                        // --- [3] 안전 로직 (Logic) ---
+                        const matrixRows = [
+                        { 
+                            id: "JAM", 
+                            name: "1. 승객 끼임 사고", 
+                            desc: "물체 감지 + 문 닫힘 시도",
+                            bits: [s_DoorObj, 0, 0, 0, s_DoorClose], 
+                            fault: s_DoorObj && s_DoorClose 
+                        },
+                        { 
+                            id: "OVL", 
+                            name: "2. 과부하 감지", 
+                            desc: "정격 하중 초과 (출발 차단)",
+                            bits: [0, s_Overload, 0, 0, 0], 
+                            fault: s_Overload 
+                        },
+                        { 
+                            id: "LVL", 
+                            name: "3. 정위치 이탈", 
+                            desc: "위치오차 + 정지(2초 경과)",
+                            bits: [0, 0, isPosError, isWaitOver, 0], 
+                            fault: isPosError && isWaitOver
+                        },
+                        ];
+
+                        const sensors = ["물체감지", "과부하", "위치오차", "구동/대기", "닫힘시도"];
+                        const isSystemFault = matrixRows.some(r => r.fault);
+
+                        return (
+                        <div className="matrix-wrapper">
+                            <table className="sensor-matrix">
+                            <thead>
+                                <tr>
+                                <th className="matrix-corner">SCENARIO</th>
+                                {sensors.map((s, i) => <th key={i}>{s}</th>)}
+                                <th className="matrix-result-header">STATUS</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {matrixRows.map((row) => (
+                                <tr key={row.id} className={row.fault ? "row-alert" : ""}>
+                                    <td className="scenario-name" title={row.desc}>
+                                    {row.name}
+                                    {/* 오탐/미탐 발생 시 시각적 표시 */}
+                                    {row.id === "JAM" && errorInjectionMode === "FP" && <span style={{color:'orange', fontSize:'0.6rem', display:'block'}}> (Noise Injected)</span>}
+                                    {row.id === "OVL" && errorInjectionMode === "FN" && <span style={{color:'red', fontSize:'0.6rem', display:'block'}}> (Sensor Dead)</span>}
+                                    <div style={{fontSize:'0.65rem', fontWeight:'normal', opacity:0.7}}>{row.desc}</div>
+                                    </td>
+                                    {row.bits.map((bit, i) => {
+                                    const isRelevant = 
+                                        (row.id === "JAM" && (i===0 || i===4)) ||
+                                        (row.id === "OVL" && (i===1)) ||
+                                        (row.id === "LVL" && (i===2 || i===3));
+                                    
+                                    return (
+                                        <td key={i} className={`bit-cell ${bit === 1 ? "on" : "off"} ${!isRelevant && bit===0 ? "dim" : ""}`}>
+                                        {isRelevant || bit === 1 ? bit : <span style={{opacity:0.1}}>0</span>}
+                                        </td>
+                                    )
+                                    })}
+                                    <td className="scenario-result">
+                                    {row.fault ? "🚨 DANGER" : "✅ SAFE"}
+                                    </td>
+                                </tr>
+                                ))}
+                            </tbody>
+                            </table>
+
+                            <div className="system-summary">
+                            System Diagnosis: 
+                            {isSystemFault 
+                                ? <span className="crit"> 🛑 OPERATION HALTED</span> 
+                                : <span className="norm"> 🟢 SYSTEM NORMAL</span>
+                            }
+                            </div>
+                        </div>
+                        );
+                    })()}
+                </div>
+
+                {/* 2. 데이터 무결성 검증 테이블 (Verification Table) */}
+                <div className="backend-card">
+                    <h3>📊 데이터 무결성 검증 (Data Integrity Check)</h3>
+                    {(() => {
+                        // 실제 값 vs 센서 값 비교
+                        const real_Jam = hasJammedOnboard;
+                        const real_Overload = isOverload;
+
+                        let sensor_Jam = real_Jam;
+                        let sensor_Overload = real_Overload;
+
+                        if (errorInjectionMode === "FP") if (!real_Jam) sensor_Jam = true; 
+                        if (errorInjectionMode === "FN") if (real_Overload) sensor_Overload = false;
+
+                        const getStatus = (real, sensor) => {
+                            if (real === sensor) return { text: "정상 (Normal)", class: "status-ok" };
+                            if (!real && sensor) return { text: "⚠️ 오탐 (False Positive)", class: "status-fp" };
+                            if (real && !sensor) return { text: "🚨 미탐 (False Negative)", class: "status-fn" };
+                            return { text: "Unknown", class: "" };
+                        };
+
+                        const jamStatus = getStatus(real_Jam, sensor_Jam);
+                        const loadStatus = getStatus(real_Overload, sensor_Overload);
+
+                        return (
+                            <table className="comparison-table">
+                                <thead>
+                                    <tr>
+                                        <th>평가 항목</th>
+                                        <th>실제 물리 상태 (Actual)</th>
+                                        <th>센서 입력 값 (Sensor)</th>
+                                        <th>진단 결과</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td className="comp-label">문 끼임 (Jamming)</td>
+                                        <td className={real_Jam ? "val-danger" : "val-safe"}>{real_Jam ? "True" : "False"}</td>
+                                        <td className={sensor_Jam ? "val-danger" : "val-safe"}>{sensor_Jam ? "1 (On)" : "0 (Off)"}</td>
+                                        <td className={`comp-result ${jamStatus.class}`}>{jamStatus.text}</td>
+                                    </tr>
+                                    <tr>
+                                        <td className="comp-label">과부하 (Overload)</td>
+                                        <td className={real_Overload ? "val-danger" : "val-safe"}>{real_Overload ? "True" : "False"}</td>
+                                        <td className={sensor_Overload ? "val-danger" : "val-safe"}>{sensor_Overload ? "1 (On)" : "0 (Off)"}</td>
+                                        <td className={`comp-result ${loadStatus.class}`}>{loadStatus.text}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        );
+                    })()}
+                </div>
             </div>
           </div>
         </div>
-
-        <div className="backend-card" style={{marginTop: "24px"}}>
-              <h3>🛡️ 자율 제어 센서 분석 행렬</h3>
-              
-              {(() => {
-                // --- [1] 센서 데이터 (Input) ---
-                const s_DoorObj   = hasJammedOnboard ? 1 : 0; 
-                const s_Overload  = isOverload ? 1 : 0;       
-                // 위치 오차: 정수 층에서 0.1 이상 벗어남
-                const isPosError  = Math.abs(realtimeFloor - Math.round(realtimeFloor)) > 0.1 ? 1 : 0;
-                
-                // 모터 구동 여부
-                const isMotorRun  = (Math.abs(speedFloorsPerSec) > 0.01 || direction !== "idle") ? 1 : 0;
-                
-                // 문 닫힘 시도
-                const s_DoorClose = (doorState === "closing" || doorState === "closed") ? 1 : 0;
-
-                // 2초 대기 여부
-                const isWaitOver = misalignWaitTime > 2000 ? 1 : 0;
-
-                // --- [2] 안전 로직 (Logic) ---
-                const matrixRows = [
-                  { 
-                    id: "JAM", 
-                    name: "1. 승객 끼임 사고", 
-                    desc: "물체 감지 + 문 닫힘 시도",
-                    bits: [s_DoorObj, 0, 0, 0, s_DoorClose], 
-                    fault: s_DoorObj && s_DoorClose 
-                  },
-                  { 
-                    id: "OVL", 
-                    name: "2. 과부하 감지", 
-                    desc: "정격 하중 초과 (출발 차단)",
-                    // 수정된 과부하 로직: 오직 '과부하'만 1이면 위험
-                    bits: [0, s_Overload, 0, 0, 0], 
-                    fault: s_Overload 
-                  },
-                  { 
-                    id: "LVL", 
-                    name: "3. 정위치 이탈", 
-                    desc: "위치오차 + 정지(2초 경과)",
-                    bits: [0, 0, isPosError, isWaitOver, 0], 
-                    fault: isPosError && isWaitOver
-                  },
-                ];
-
-                const sensors = ["물체감지", "과부하", "위치오차", "구동/대기", "닫힘시도"];
-
-                const isSystemFault = matrixRows.some(r => r.fault);
-
-                return (
-                  <div className="matrix-wrapper">
-                    <table className="sensor-matrix">
-                      <thead>
-                        <tr>
-                          <th className="matrix-corner">SCENARIO</th>
-                          {sensors.map((s, i) => <th key={i}>{s}</th>)}
-                          <th className="matrix-result-header">STATUS</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {matrixRows.map((row) => (
-                          <tr key={row.id} className={row.fault ? "row-alert" : ""}>
-                            <td className="scenario-name" title={row.desc}>
-                              {row.name}
-                              <div style={{fontSize:'0.65rem', fontWeight:'normal', opacity:0.7}}>
-                                {row.desc}
-                              </div>
-                            </td>
-                            {row.bits.map((bit, i) => {
-                              const isRelevant = 
-                                (row.id === "JAM" && (i===0 || i===4)) ||
-                                (row.id === "OVL" && (i===1)) ||
-                                (row.id === "LVL" && (i===2 || i===3));
-                              
-                              return (
-                                <td key={i} className={`bit-cell ${bit === 1 ? "on" : "off"} ${!isRelevant && bit===0 ? "dim" : ""}`}>
-                                  {isRelevant || bit === 1 ? bit : <span style={{opacity:0.1}}>0</span>}
-                                </td>
-                              )
-                            })}
-                            <td className="scenario-result">
-                              {row.fault ? "🚨 DANGER" : "✅ SAFE"}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-
-                    <div className="system-summary">
-                      System Diagnosis: 
-                      {isSystemFault 
-                        ? <span className="crit"> 🛑 OPERATION HALTED</span> 
-                        : <span className="norm"> 🟢 SYSTEM NORMAL</span>
-                      }
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
-            <div className="backend-card" style={{marginTop: "24px"}}>
-              <h3>마지막 백엔드 명령</h3>
-              <p className="last-command">{lastCommand || "수신된 명령이 없습니다."}</p>
-            </div>
       </section>
       
       <footer className="dash-footer">© 2025 CPS Elevator System</footer>
