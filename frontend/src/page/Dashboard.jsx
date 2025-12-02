@@ -108,7 +108,7 @@ function Dashboard() {
       // -----------------------------------------------------
       case "FIX_ALIGNMENT":
         if (ctrl.isMisaligned) {
-            console.log("🛠️ 백엔드 명령: 정위치 수정 실행");
+            console.log("백엔드 명령: 정위치 수정 실행");
             ctrl.fixMisalign(); // 컨트롤러의 보정 함수 실행
             alert(`[자율제어 알림]\n\n${command.message}\n(정위치 자동 수정을 시작합니다.)`);
         } else {
@@ -120,7 +120,7 @@ function Dashboard() {
       // CASE 2: 문 끼임 -> 강제 개방 (Safety Re-open)
       // -----------------------------------------------------
       case "FORCE_OPEN":
-        console.log("🚪 백엔드 명령: 문 강제 개방");
+        console.log("백엔드 명령: 문 강제 개방");
         // 문이 닫혀있거나 닫는 중이면 다시 염
         if (ctrl.doorState !== 'open') {
             ctrl.openDoor(); 
@@ -133,7 +133,7 @@ function Dashboard() {
       // CASE 3: 과부하 경고 (Overload Warning)
       // -----------------------------------------------------
       case "OVERLOAD_WARN":
-        console.log("⚖️ 백엔드 명령: 과부하 경고");
+        console.log("백엔드 명령: 과부하 경고");
         // 과부하 시에는 보통 동작을 멈추므로, 여기선 경고창만 띄움
         alert(`[경고]\n\n${command.message}\n(최대 하중 500kg을 초과했습니다.)`);
         break;
@@ -261,17 +261,17 @@ function Dashboard() {
   // 로그 자동 추가
   useEffect(() => {
     if (sensor_Misaligned && misalignWaitTime > 2000 && !misalignLoggedRef.current) {
-      addLogEntry({ timestamp: new Date().toISOString(), level: 'WARN', message: '[WARN] 정위치 정차 실패 (2초 경과 - 위험 확정)' })
+      addLogEntry({ timestamp: new Date().toISOString(), level: 'WARN', message: '정위치 정차 실패 (2초 경과 - 위험 확정)' })
       misalignLoggedRef.current = true; 
     }
   }, [sensor_Misaligned, misalignWaitTime, addLogEntry])
 
   useEffect(() => {
-    if (sensor_Overload) addLogEntry({ timestamp: new Date().toISOString(), level: 'ALERT', message: '[ALERT] 과부하 알림 (500kg 초과)' })
+    if (sensor_Overload) addLogEntry({ timestamp: new Date().toISOString(), level: 'ALERT', message: '과부하 알림 (500kg 초과)' })
   }, [sensor_Overload, addLogEntry])
 
   useEffect(() => {
-    if (sensor_Jammed) addLogEntry({ timestamp: new Date().toISOString(), level: 'ALERT', message: '[ALERT] 문 끼임 승객 감지' })
+    if (sensor_Jammed) addLogEntry({ timestamp: new Date().toISOString(), level: 'ALERT', message: '문 끼임 승객 감지' })
   }, [sensor_Jammed, addLogEntry])
 
   const statusLabel = direction === "idle" ? "대기" : direction === "up" ? "상행" : "하행"
