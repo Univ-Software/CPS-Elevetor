@@ -97,7 +97,7 @@ function Dashboard() {
   */
   const handleBackendCommand = useCallback((command) => {
     // 1. 명령 수신 로그 기록
-    const msg = `[CMD] ${command.type}: ${command.message || ''}`;
+    const msg = ` ${command.type}: ${command.message || ''}`;
     setLastCommand(msg);
     addLogEntry({ timestamp: new Date().toISOString(), level: 'CMD', message: msg })
 
