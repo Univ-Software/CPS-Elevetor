@@ -182,19 +182,19 @@ function Dashboard() {
   // 로그 자동 추가
   useEffect(() => {
     if (isMisaligned) {
-      addLogEntry({ timestamp: new Date().toISOString(), level: 'WARN', message: '[WARN] 정위치 정차 실패 감지' })
+      addLogEntry({ timestamp: new Date().toISOString(), level: 'WARN', message: '정위치 정차 실패 감지' })
     }
   }, [isMisaligned, addLogEntry])
 
   useEffect(() => {
     if (isOverload) {
-      addLogEntry({ timestamp: new Date().toISOString(), level: 'ALERT', message: '[ALERT] 과부하 알림 (500kg 초과)' })
+      addLogEntry({ timestamp: new Date().toISOString(), level: 'ALERT', message: '과부하 알림 (500kg 초과)' })
     }
   }, [isOverload, addLogEntry])
 
   useEffect(() => {
     if (hasJammedOnboard) {
-      addLogEntry({ timestamp: new Date().toISOString(), level: 'ALERT', message: '[ALERT] 문 끼임 승객 감지' })
+      addLogEntry({ timestamp: new Date().toISOString(), level: 'ALERT', message: '문 끼임 승객 감지' })
     }
   }, [hasJammedOnboard, addLogEntry])
 
