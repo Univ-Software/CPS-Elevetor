@@ -20,8 +20,6 @@ import java.time.format.DateTimeFormatter;
 /**
  * WebSocket controller for handling elevator sensor data
  * Flow: Receive → Parse → Analyze → Check State Change → Save (if changed) → Log (if changed) → Respond
- *
- * Note: For idle/LOW states, only saves and logs ONCE when entering idle, not repeatedly
  */
 @Controller
 @RequiredArgsConstructor
@@ -37,9 +35,6 @@ public class SensorDataController {
      * Endpoint for receiving sensor data from frontend
      * Frontend sends to: /app/sensor-data
      * Response broadcasts to: /topic/sensor-response
-     *
-     * @param request Sensor data from frontend (parsed automatically)
-     * @return Response with analysis results (null = no broadcast)
      */
     @MessageMapping("/sensor-data")
     @SendTo("/topic/sensor-response")
@@ -59,7 +54,6 @@ public class SensorDataController {
             String analysisMessage = analysisService.generateAnalysisMessage(request, dangerLevel);
 
             // Step 4: Check if this state change should be saved and logged
-            // For idle states, only save/log ONCE when entering idle
             boolean shouldSaveAndLog = stateTracker.shouldSaveAndLog(request, dangerLevel);
 
             if (shouldSaveAndLog) {
@@ -69,6 +63,10 @@ public class SensorDataController {
 
                 // Step 6: Log with appropriate danger level
                 loggerService.logSensorData(savedData);
+
+                // ▼▼▼ [추가된 부분] Step 6-1: 자율 제어 분석 및 명령 전송 실행 ▼▼▼
+                loggerService.analyzeAndSendCommand(savedData);
+                // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
                 // Step 7: Build and return response (broadcast to frontend)
                 return buildSuccessResponse(savedData);
@@ -85,13 +83,12 @@ public class SensorDataController {
         }
     }
 
-    /**
-     * Build SensorData entity from request
-     */
+    // --- Helper Methods (변경 없음) ---
+
     private SensorData buildSensorData(SensorDataRequest request,
-                                       DangerLevel dangerLevel,
-                                       String analysisMessage,
-                                       LocalDateTime receivedTimestamp) {
+                                     DangerLevel dangerLevel,
+                                     String analysisMessage,
+                                     LocalDateTime receivedTimestamp) {
         return SensorData.builder()
                 .elevatorId(request.getElevatorId())
                 .currentFloor(request.getCurrentFloor())
@@ -107,9 +104,6 @@ public class SensorDataController {
                 .build();
     }
 
-    /**
-     * Build success response from saved data
-     */
     private SensorDataResponse buildSuccessResponse(SensorData savedData) {
         return SensorDataResponse.builder()
                 .id(savedData.getId())
@@ -127,9 +121,6 @@ public class SensorDataController {
                 .build();
     }
 
-    /**
-     * Build error response
-     */
     private SensorDataResponse buildErrorResponse(String errorMessage) {
         return SensorDataResponse.builder()
                 .id(-1L)
@@ -139,9 +130,6 @@ public class SensorDataController {
                 .build();
     }
 
-    /**
-     * Parse ISO timestamp from frontend
-     */
     private LocalDateTime parseTimestamp(String timestamp) {
         try {
             if (timestamp != null && !timestamp.isEmpty()) {
