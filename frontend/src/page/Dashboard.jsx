@@ -18,16 +18,18 @@ function Dashboard() {
   const [targetFloor, setTargetFloor] = useState(5)
   const [nextPassengerId, setNextPassengerId] = useState(1)
   
-  // 백엔드 로그
+  // 백엔드 명령 로그 표시용
   const [lastCommand, setLastCommand] = useState(null)
   const [logEntries, setLogEntries] = useState([
     { timestamp: new Date().toISOString(), level: 'INFO', message: '시스템 시작' }
   ])
 
-  // [추가] 정위치 오차 지속 시간 (ms)
+  // 정위치 오차 지속 시간 (ms) & 로그 중복 방지 Ref
   const [misalignWaitTime, setMisalignWaitTime] = useState(0);
   const misalignStartRef = useRef(null);
+  const misalignLoggedRef = useRef(false); // [최적화] 로그 중복 방지
 
+  // 로그 추가 함수 (최신순 유지, 최대 200개)
   const addLogEntry = useCallback((entry) => {
     setLogEntries(prev => {
       const next = [entry, ...prev]
@@ -93,7 +95,7 @@ function Dashboard() {
 
   const doorLooksOpen = doorState === "open" || doorState === "opening"
 
-  // 3. 화면 계산
+  // 3. 화면 렌더링용 계산
   const floorIndexFromBottom = (f) => f - 1
   const currentIndex = floorIndexFromBottom(carFloor)
   const carBottom = Math.max(0, currentIndex * FLOOR_HEIGHT + FLOOR_BASE_OFFSET + 10)
@@ -103,26 +105,36 @@ function Dashboard() {
   const displayFloor = Math.round(realtimeFloor)
 
   // ----------------------------------------------------------------
-  // [NEW] 정위치 오차 시간 측정 로직 (2초 딜레이용)
+  // [수정] 정위치 오차 시간 측정 (Interval 사용)
   // ----------------------------------------------------------------
   useEffect(() => {
-    // 1. 차량이 멈췄는가? (속도 0)
     const isStopped = Math.abs(speedFloorsPerSec) <= 0.01;
-    // 2. 위치가 틀렸는가? (소수점 오차 0.1 이상)
     const dist = Math.abs(realtimeFloor - Math.round(realtimeFloor));
     const isPosError = dist > 0.1;
 
+    let intervalId;
+
     if (isStopped && isPosError) {
         if (misalignStartRef.current === null) {
-            misalignStartRef.current = Date.now(); // 타이머 시작
-        } else {
-            // 경과 시간 업데이트
-            setMisalignWaitTime(Date.now() - misalignStartRef.current);
+            misalignStartRef.current = Date.now();
         }
+        
+        // 0.1초마다 업데이트하여 2초 경과를 감지
+        intervalId = setInterval(() => {
+            if (misalignStartRef.current) {
+                setMisalignWaitTime(Date.now() - misalignStartRef.current);
+            }
+        }, 100);
+
     } else {
-        // 정상이거나 이동 중이면 타이머 리셋
         misalignStartRef.current = null;
         setMisalignWaitTime(0);
+        // 상태가 정상이 되면 로그 플래그 초기화
+        misalignLoggedRef.current = false;
+    }
+
+    return () => {
+        if (intervalId) clearInterval(intervalId);
     }
   }, [speedFloorsPerSec, realtimeFloor]);
 
@@ -184,9 +196,9 @@ function Dashboard() {
     if (!isStillNeeded) ctrl.removeRequest(destFloor)
   }
 
-  // 문 열림 시 탑승/하차
+  // 문 열림 시 탑승/하차 (정위치 실패 시 탑승 차단)
   useEffect(() => {
-    if (doorState !== "open" || isMisaligned) return // 정위치 실패 시 탑승 차단
+    if (doorState !== "open" || isMisaligned) return 
 
     setPassengers((prev) => {
       const boardingTargets = []
@@ -205,11 +217,12 @@ function Dashboard() {
     })
   }, [doorState, currentFloor, ctrl, isMisaligned])
 
-  // 로그 자동 추가
-  // 정위치 실패는 2초 지난 뒤에 로그 찍히게 수정 (불필요한 로그 방지)
+  // 로그 자동 추가 (도배 방지 로직 적용)
   useEffect(() => {
-    if (isMisaligned && misalignWaitTime > 2000) {
-      addLogEntry({ timestamp: new Date().toISOString(), level: 'WARN', message: '[WARN] 정위치 정차 실패 (2초 경과)' })
+    // 2초가 지났고 && 아직 로그를 안 찍었을 때만 실행
+    if (isMisaligned && misalignWaitTime > 2000 && !misalignLoggedRef.current) {
+      addLogEntry({ timestamp: new Date().toISOString(), level: 'WARN', message: '[WARN] 정위치 정차 실패 (2초 경과 - 위험 감지)' })
+      misalignLoggedRef.current = true; // 로그 찍음 표시
     }
   }, [isMisaligned, misalignWaitTime, addLogEntry])
 
@@ -400,16 +413,16 @@ function Dashboard() {
                 // --- [1] 센서 데이터 (Input) ---
                 const s_DoorObj   = hasJammedOnboard ? 1 : 0; 
                 const s_Overload  = isOverload ? 1 : 0;       
-                // 위치 오차: 정수 층에서 0.1 이상 벗어남 (실시간)
+                // 위치 오차: 정수 층에서 0.1 이상 벗어남
                 const isPosError  = Math.abs(realtimeFloor - Math.round(realtimeFloor)) > 0.1 ? 1 : 0;
                 
-                // 모터 구동 여부 (속도가 0.01 이상이면 1)
+                // 모터 구동 여부
                 const isMotorRun  = (Math.abs(speedFloorsPerSec) > 0.01 || direction !== "idle") ? 1 : 0;
                 
-                // 문 닫힘 시도 (문이 닫혀있거나 닫는 중)
+                // 문 닫힘 시도
                 const s_DoorClose = (doorState === "closing" || doorState === "closed") ? 1 : 0;
 
-                // ★핵심 변경★ 2초 대기 후 여부 (2000ms 넘으면 1)
+                // 2초 대기 여부
                 const isWaitOver = misalignWaitTime > 2000 ? 1 : 0;
 
                 // --- [2] 안전 로직 (Logic) ---
@@ -423,23 +436,21 @@ function Dashboard() {
                   },
                   { 
                     id: "OVL", 
-                    name: "2. 과부하 운행", 
-                    desc: "과부하 + 모터 구동",
-                    bits: [0, s_Overload, 0, isMotorRun, 0], 
+                    name: "2. 과부하 감지", 
+                    desc: "정격 하중 초과 (출발 차단)",
+                    // 수정된 과부하 로직: 오직 '과부하'만 1이면 위험
+                    bits: [0, s_Overload, 0, 0, 0], 
                     fault: s_Overload 
                   },
                   { 
                     id: "LVL", 
                     name: "3. 정위치 이탈", 
-                    desc: "위치오차 + 정지(2초 경과)", // 설명 업데이트
-                    // [ 물체감지, 과부하, 위치오차, 정지(2s), 닫힘시도 ]
-                    // 위치오차(1) AND 정지후2초(1) 이면 위험!
+                    desc: "위치오차 + 정지(2초 경과)",
                     bits: [0, 0, isPosError, isWaitOver, 0], 
                     fault: isPosError && isWaitOver
                   },
                 ];
 
-                // 컬럼 헤더 수정: 4번째를 '구동/정지' -> '구동/대기' 등으로 의미 확장
                 const sensors = ["물체감지", "과부하", "위치오차", "구동/대기", "닫힘시도"];
 
                 const isSystemFault = matrixRows.some(r => r.fault);
@@ -466,7 +477,7 @@ function Dashboard() {
                             {row.bits.map((bit, i) => {
                               const isRelevant = 
                                 (row.id === "JAM" && (i===0 || i===4)) ||
-                                (row.id === "OVL" && (i===1 || i===3)) ||
+                                (row.id === "OVL" && (i===1)) ||
                                 (row.id === "LVL" && (i===2 || i===3));
                               
                               return (
