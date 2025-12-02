@@ -505,6 +505,10 @@ function Dashboard() {
                 );
               })()}
             </div>
+            <div className="backend-card" style={{marginTop: "24px"}}>
+              <h3>마지막 백엔드 명령</h3>
+              <p className="last-command">{lastCommand || "수신된 명령이 없습니다."}</p>
+            </div>
       </section>
       
       <footer className="dash-footer">© 2025 CPS Elevator System</footer>
