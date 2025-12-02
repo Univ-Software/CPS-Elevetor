@@ -19,7 +19,7 @@ function Dashboard() {
   const [targetFloor, setTargetFloor] = useState(5)
   const [nextPassengerId, setNextPassengerId] = useState(1)
   
-  // [NEW] 에러 주입 모드 (NONE, FP:오탐, FN:미탐)
+  // 에러 주입 모드 (NONE, FP:오탐, FN:미탐)
   const [errorInjectionMode, setErrorInjectionMode] = useState("NONE");
 
   // 백엔드 로그 및 명령 상태
@@ -33,7 +33,6 @@ function Dashboard() {
   const misalignStartRef = useRef(null);
   const misalignLoggedRef = useRef(false);
 
-  // 로그 추가 함수 (최신순 유지, 최대 200개)
   const addLogEntry = useCallback((entry) => {
     setLogEntries(prev => {
       const next = [entry, ...prev]
@@ -41,21 +40,38 @@ function Dashboard() {
     })
   }, [])
 
-  // 승객 필터링
+  // --- 2. 물리적 상태 계산 (Ground Truth) ---
   const visiblePassengers = passengers.filter((p) => p.status !== "done")
   const onboardPassengers = passengers.filter((p) => p.status === "onboard")
   
   const onboardCount = onboardPassengers.length
   const onboardWeightKg = onboardPassengers.reduce((sum, p) => sum + (p.weightKg ?? 0), 0)
   
-  // 물리적 상태 (Ground Truth)
-  const isOverload = onboardWeightKg > MAX_LOAD_KG
-  const hasJammedOnboard = onboardPassengers.some((p) => p.isJammed)
+  // [Real] 실제 물리적 상황
+  const real_Overload = onboardWeightKg > MAX_LOAD_KG
+  const real_Jammed = onboardPassengers.some((p) => p.isJammed)
 
-  // --- 2. 컨트롤러 연결 ---
+  // --- 3. 센서 데이터 생성 (Sensor Layer + Error Injection) ---
+  // 이 값들이 제어기와 백엔드로 넘어갑니다.
+  let sensor_Overload = real_Overload;
+  let sensor_Jammed = real_Jammed;
+
+  if (errorInjectionMode === "FP") {
+    // 오탐(False Positive): 실제로는 없는데(false), 센서는 감지(true)
+    // 예: 유령 감지 (문이 안 닫힘)
+    if (!real_Jammed) sensor_Jammed = true;
+  } 
+  else if (errorInjectionMode === "FN") {
+    // 미탐(False Negative): 실제로는 있는데(true), 센서는 미감지(false)
+    // 예: 센서 고장 (과부하인데 출발함 -> 사고 발생 시뮬레이션)
+    if (real_Overload) sensor_Overload = false;
+  }
+
+  // --- 4. 컨트롤러 연결 (센서 값을 입력으로 줌) ---
+  // 중요: 컨트롤러는 '센서 값'을 믿고 동작합니다.
   const ctrl = useElevatorController({
-    isOverload,
-    hasJammedOnboard,
+    isOverload: sensor_Overload,
+    hasJammedOnboard: sensor_Jammed,
   })
 
   // 백엔드 명령 처리 핸들러
@@ -83,15 +99,16 @@ function Dashboard() {
     }
   }, [ctrl, addLogEntry]); 
 
-  // --- 3. 네트워크 연결 ---
+  // --- 5. 네트워크 연결 (백엔드로 센서 값 전송) ---
   const elevatorState = {
     currentFloor: ctrl.currentFloor,
     realtimeFloor: ctrl.realtimeFloor,
     speedFloorsPerSec: ctrl.speedFloorsPerSec,
     doorState: ctrl.doorState,
     direction: ctrl.direction,
-    isOverload,
-    hasJammedOnboard,
+    // [중요] 백엔드에도 '오염된 센서 값'을 보냄 (현실 반영)
+    isOverload: sensor_Overload,
+    hasJammedOnboard: sensor_Jammed,
   }
   
   const { isConnected } = useElevatorNetwork(elevatorState, handleBackendCommand)
@@ -103,7 +120,7 @@ function Dashboard() {
 
   const doorLooksOpen = doorState === "open" || doorState === "opening"
 
-  // --- 4. 화면 렌더링용 계산 ---
+  // --- 6. 화면 렌더링용 계산 ---
   const floorIndexFromBottom = (f) => f - 1
   const currentIndex = floorIndexFromBottom(carFloor)
   const carBottom = Math.max(0, currentIndex * FLOOR_HEIGHT + FLOOR_BASE_OFFSET + 10)
@@ -113,7 +130,7 @@ function Dashboard() {
   const displayFloor = Math.round(realtimeFloor)
 
   // ----------------------------------------------------------------
-  // [로직] 정위치 오차 시간 측정 (Interval 사용)
+  // [로직] 정위치 오차 시간 측정
   // ----------------------------------------------------------------
   useEffect(() => {
     const isStopped = Math.abs(speedFloorsPerSec) <= 0.01;
@@ -126,18 +143,14 @@ function Dashboard() {
         if (misalignStartRef.current === null) {
             misalignStartRef.current = Date.now();
         }
-        
-        // 0.1초마다 업데이트하여 2초 경과를 감지
         intervalId = setInterval(() => {
             if (misalignStartRef.current) {
                 setMisalignWaitTime(Date.now() - misalignStartRef.current);
             }
         }, 100);
-
     } else {
         misalignStartRef.current = null;
         setMisalignWaitTime(0);
-        // 상태가 정상으로 돌아오면 로그 플래그 초기화
         misalignLoggedRef.current = false;
     }
 
@@ -147,7 +160,7 @@ function Dashboard() {
   }, [speedFloorsPerSec, realtimeFloor]);
 
 
-  // --- 5. 이벤트 핸들러 ---
+  // --- 7. 이벤트 핸들러 ---
   const handleAddPassenger = (e) => {
     e.preventDefault()
     if (spawnFloor === targetFloor) return alert("출발/목적층이 같습니다.")
@@ -204,9 +217,7 @@ function Dashboard() {
     if (!isStillNeeded) ctrl.removeRequest(destFloor)
   }
 
-  // --- 6. Effects (탑승 및 로그) ---
-  
-  // 문 열림 시 탑승/하차 (정위치 실패 시 차단)
+  // 문 열림 시 탑승/하차 (정위치 실패 시 탑승 차단)
   useEffect(() => {
     if (doorState !== "open" || isMisaligned) return 
 
@@ -227,26 +238,25 @@ function Dashboard() {
     })
   }, [doorState, currentFloor, ctrl, isMisaligned])
 
-  // 로그 자동 추가 (도배 방지 최적화)
+  // --- 8. 로그 자동 추가 (센서 값을 기준으로 기록) ---
   useEffect(() => {
-    // 2초가 지났고 && 아직 로그를 안 찍었을 때만 실행
     if (isMisaligned && misalignWaitTime > 2000 && !misalignLoggedRef.current) {
       addLogEntry({ timestamp: new Date().toISOString(), level: 'WARN', message: '[WARN] 정위치 정차 실패 (2초 경과 - 위험 확정)' })
-      misalignLoggedRef.current = true; // 플래그 잠금
+      misalignLoggedRef.current = true; 
     }
   }, [isMisaligned, misalignWaitTime, addLogEntry])
 
   useEffect(() => {
-    if (isOverload) {
+    if (sensor_Overload) {
       addLogEntry({ timestamp: new Date().toISOString(), level: 'ALERT', message: '[ALERT] 과부하 알림 (500kg 초과)' })
     }
-  }, [isOverload, addLogEntry])
+  }, [sensor_Overload, addLogEntry])
 
   useEffect(() => {
-    if (hasJammedOnboard) {
+    if (sensor_Jammed) {
       addLogEntry({ timestamp: new Date().toISOString(), level: 'ALERT', message: '[ALERT] 문 끼임 승객 감지' })
     }
-  }, [hasJammedOnboard, addLogEntry])
+  }, [sensor_Jammed, addLogEntry])
 
   const statusLabel = direction === "idle" ? "대기" : direction === "up" ? "상행" : "하행"
   const statusColor = direction === "idle" ? "#6b7280" : direction === "up" ? "#2563eb" : "#dc2626"
@@ -265,7 +275,7 @@ function Dashboard() {
             </p>
             <p className="queue-info">대기 큐: {queue.length === 0 ? "없음" : queue.join(" → ")}</p>
             <p className="capacity-info">
-              정격 적재 {MAX_LOAD_KG}kg · <span className={`capacity-count ${isOverload ? "full" : ""}`}>현재 {onboardCount}명 / {onboardWeightKg}kg</span>
+              정격 적재 {MAX_LOAD_KG}kg · <span className={`capacity-count ${sensor_Overload ? "full" : ""}`}>현재 {onboardCount}명 / {onboardWeightKg}kg</span>
             </p>
             <p className="speed-info">속도: {speedFloorsPerSec.toFixed(2)} 층/초</p>
           </div>
@@ -305,7 +315,6 @@ function Dashboard() {
             <p className="level-hint">정위치 실패 모드를 켜면 1~5층 랜덤 위치에 정차하고 문이 열리지 않습니다. "자동 수정"으로 해결하세요.</p>
           </div>
 
-          {/* [NEW] 오탐/미탐 테스트 버튼 섹션 */}
           <div className="error-test-section" style={{marginTop: '20px', borderTop: '1px dashed #e2e8f0', paddingTop: '16px'}}>
             <h3 style={{fontSize:'0.95rem', color:'#475569', marginBottom:'8px'}}>🧪 센서 신뢰성 평가 (Injection)</h3>
             <div style={{display:'flex', gap:'8px', flexDirection:'column'}}>
@@ -406,15 +415,15 @@ function Dashboard() {
             {/* 왼쪽 카드: 실시간 센서값 + 로그 */}
             <div style={{display:'flex', flexDirection:'column', gap:'24px'}}>
                 <div className="backend-card">
-                <h3>실시간 센서 값</h3>
+                <h3>실시간 센서 값 (Sensor Readings)</h3>
                 <table className="backend-table">
                     <thead><tr><th>항목</th><th>값</th><th>단위</th><th>상태</th></tr></thead>
                     <tbody>
                     <tr><td>현재 층</td><td>{displayFloor}</td><td>층</td><td>-</td></tr>
                     <tr><td>카 위치</td><td>{realtimePx.toFixed(1)}</td><td>px</td><td>{isMisaligned ? "정위치 실패" : "정상"}</td></tr>
                     <tr><td>속도</td><td>{speedFloorsPerSec.toFixed(2)}</td><td>층/초</td><td>{isMoving ? "이동 중" : "정지"}</td></tr>
-                    <tr><td>문 상태</td><td>{doorState}</td><td>-</td><td>{hasJammedOnboard ? "끼임 감지" : "정상"}</td></tr>
-                    <tr><td>적재량</td><td>{onboardWeightKg}</td><td>kg</td><td>{isOverload ? "과부하" : "정상"}</td></tr>
+                    <tr><td>문 상태</td><td>{doorState}</td><td>-</td><td>{sensor_Jammed ? "끼임 감지" : "정상"}</td></tr>
+                    <tr><td>적재량</td><td>{onboardWeightKg}</td><td>kg</td><td>{sensor_Overload ? "과부하" : "정상"}</td></tr>
                     </tbody>
                 </table>
                 </div>
@@ -446,29 +455,17 @@ function Dashboard() {
                     <h3>🛡️ 자율 제어 센서 분석 행렬</h3>
                     
                     {(() => {
-                        // --- [1] 물리적 진실 (Ground Truth) ---
-                        const real_DoorObj   = hasJammedOnboard;
-                        const real_Overload  = isOverload;
+                        // --- 센서 데이터 (Input) - 오염된 값 사용 ---
+                        const s_DoorObj   = sensor_Jammed ? 1 : 0; 
+                        const s_Overload  = sensor_Overload ? 1 : 0;       
                         
-                        // --- [2] 센서 값 (Sensor Data - 에러 주입 적용) ---
-                        let s_DoorObj   = real_DoorObj ? 1 : 0;
-                        let s_Overload  = real_Overload ? 1 : 0;
-
-                        // 에러 주입: 센서 값을 조작함
-                        if (errorInjectionMode === "FP") {
-                            if (!real_DoorObj) s_DoorObj = 1; // 오탐: 실제론 없는데 있다고 함
-                        }
-                        if (errorInjectionMode === "FN") {
-                            if (real_Overload) s_Overload = 0; // 미탐: 실제론 과부하인데 없다고 함
-                        }
-
                         // 기타 센서들 (정상)
                         const isPosError  = Math.abs(realtimeFloor - Math.round(realtimeFloor)) > 0.1 ? 1 : 0;
                         const isMotorRun  = (Math.abs(speedFloorsPerSec) > 0.01 || direction !== "idle") ? 1 : 0;
                         const s_DoorClose = (doorState === "closing" || doorState === "closed") ? 1 : 0;
                         const isWaitOver  = misalignWaitTime > 2000 ? 1 : 0;
 
-                        // --- [3] 안전 로직 (Logic) ---
+                        // --- 안전 로직 (Logic) ---
                         const matrixRows = [
                         { 
                             id: "JAM", 
@@ -552,16 +549,7 @@ function Dashboard() {
                 <div className="backend-card">
                     <h3>📊 데이터 무결성 검증 (Data Integrity Check)</h3>
                     {(() => {
-                        // 실제 값 vs 센서 값 비교
-                        const real_Jam = hasJammedOnboard;
-                        const real_Overload = isOverload;
-
-                        let sensor_Jam = real_Jam;
-                        let sensor_Overload = real_Overload;
-
-                        if (errorInjectionMode === "FP") if (!real_Jam) sensor_Jam = true; 
-                        if (errorInjectionMode === "FN") if (real_Overload) sensor_Overload = false;
-
+                        // 진단 로직: 실제 값 vs 오염된 센서 값 비교
                         const getStatus = (real, sensor) => {
                             if (real === sensor) return { text: "정상 (Normal)", class: "status-ok" };
                             if (!real && sensor) return { text: "⚠️ 오탐 (False Positive)", class: "status-fp" };
@@ -569,7 +557,7 @@ function Dashboard() {
                             return { text: "Unknown", class: "" };
                         };
 
-                        const jamStatus = getStatus(real_Jam, sensor_Jam);
+                        const jamStatus = getStatus(real_Jammed, sensor_Jammed);
                         const loadStatus = getStatus(real_Overload, sensor_Overload);
 
                         return (
@@ -577,22 +565,22 @@ function Dashboard() {
                                 <thead>
                                     <tr>
                                         <th>평가 항목</th>
-                                        <th>실제 물리 상태 (Actual)</th>
-                                        <th>센서 입력 값 (Sensor)</th>
-                                        <th>진단 결과</th>
+                                        <th>실제 물리 상태 (Ground Truth)</th>
+                                        <th>센서 입력 값 (Sensor Data)</th>
+                                        <th>진단 결과 (Diagnosis)</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <tr>
                                         <td className="comp-label">문 끼임 (Jamming)</td>
-                                        <td className={real_Jam ? "val-danger" : "val-safe"}>{real_Jam ? "True" : "False"}</td>
-                                        <td className={sensor_Jam ? "val-danger" : "val-safe"}>{sensor_Jam ? "1 (On)" : "0 (Off)"}</td>
+                                        <td className={real_Jammed ? "val-danger" : "val-safe"}>{real_Jammed ? "있음 (True)" : "없음 (False)"}</td>
+                                        <td className={sensor_Jammed ? "val-danger" : "val-safe"}>{sensor_Jammed ? "감지 (1)" : "미감지 (0)"}</td>
                                         <td className={`comp-result ${jamStatus.class}`}>{jamStatus.text}</td>
                                     </tr>
                                     <tr>
                                         <td className="comp-label">과부하 (Overload)</td>
-                                        <td className={real_Overload ? "val-danger" : "val-safe"}>{real_Overload ? "True" : "False"}</td>
-                                        <td className={sensor_Overload ? "val-danger" : "val-safe"}>{sensor_Overload ? "1 (On)" : "0 (Off)"}</td>
+                                        <td className={real_Overload ? "val-danger" : "val-safe"}>{real_Overload ? "초과 (True)" : "정상 (False)"}</td>
+                                        <td className={sensor_Overload ? "val-danger" : "val-safe"}>{sensor_Overload ? "감지 (1)" : "미감지 (0)"}</td>
                                         <td className={`comp-result ${loadStatus.class}`}>{loadStatus.text}</td>
                                     </tr>
                                 </tbody>
