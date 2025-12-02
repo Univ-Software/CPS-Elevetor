@@ -1,5 +1,5 @@
 // src/page/Dashboard.jsx
-import { useState, useEffect, useCallback } from "react" 
+import { useState, useEffect, useCallback, useRef } from "react" 
 import "./Dashboard.css"
 import { useElevatorController } from "../hooks/useElevatorController"
 import { useElevatorNetwork } from "../hooks/useElevatorNetwork"
@@ -18,11 +18,15 @@ function Dashboard() {
   const [targetFloor, setTargetFloor] = useState(5)
   const [nextPassengerId, setNextPassengerId] = useState(1)
   
-  // 백엔드 명령 로그 표시용 상태
+  // 백엔드 로그
   const [lastCommand, setLastCommand] = useState(null)
   const [logEntries, setLogEntries] = useState([
     { timestamp: new Date().toISOString(), level: 'INFO', message: '시스템 시작' }
   ])
+
+  // [추가] 정위치 오차 지속 시간 (ms)
+  const [misalignWaitTime, setMisalignWaitTime] = useState(0);
+  const misalignStartRef = useRef(null);
 
   const addLogEntry = useCallback((entry) => {
     setLogEntries(prev => {
@@ -45,7 +49,7 @@ function Dashboard() {
     hasJammedOnboard,
   })
 
-  // 백엔드 명령 처리 핸들러
+  // 백엔드 명령 처리
   const handleBackendCommand = useCallback((command) => {
     const msg = `[CMD] ${command.type}: ${command.message || ''}`;
     setLastCommand(msg);
@@ -69,7 +73,7 @@ function Dashboard() {
     }
   }, [ctrl, addLogEntry]); 
 
-  // 2. 네트워크 훅 연결
+  // 2. 네트워크 연결
   const elevatorState = {
     currentFloor: ctrl.currentFloor,
     realtimeFloor: ctrl.realtimeFloor,
@@ -89,16 +93,39 @@ function Dashboard() {
 
   const doorLooksOpen = doorState === "open" || doorState === "opening"
 
-  // 3. 화면 렌더링용 계산
+  // 3. 화면 계산
   const floorIndexFromBottom = (f) => f - 1
   const currentIndex = floorIndexFromBottom(carFloor)
   const carBottom = Math.max(0, currentIndex * FLOOR_HEIGHT + FLOOR_BASE_OFFSET + 10)
   
   const realtimeIndex = floorIndexFromBottom(realtimeFloor)
   const realtimePx = Math.max(0, realtimeIndex * FLOOR_HEIGHT + FLOOR_BASE_OFFSET + 10)
-  
-  // [수정] 실시간 층수 표시 (반올림)
   const displayFloor = Math.round(realtimeFloor)
+
+  // ----------------------------------------------------------------
+  // [NEW] 정위치 오차 시간 측정 로직 (2초 딜레이용)
+  // ----------------------------------------------------------------
+  useEffect(() => {
+    // 1. 차량이 멈췄는가? (속도 0)
+    const isStopped = Math.abs(speedFloorsPerSec) <= 0.01;
+    // 2. 위치가 틀렸는가? (소수점 오차 0.1 이상)
+    const dist = Math.abs(realtimeFloor - Math.round(realtimeFloor));
+    const isPosError = dist > 0.1;
+
+    if (isStopped && isPosError) {
+        if (misalignStartRef.current === null) {
+            misalignStartRef.current = Date.now(); // 타이머 시작
+        } else {
+            // 경과 시간 업데이트
+            setMisalignWaitTime(Date.now() - misalignStartRef.current);
+        }
+    } else {
+        // 정상이거나 이동 중이면 타이머 리셋
+        misalignStartRef.current = null;
+        setMisalignWaitTime(0);
+    }
+  }, [speedFloorsPerSec, realtimeFloor]);
+
 
   // 4. 이벤트 핸들러
   const handleAddPassenger = (e) => {
@@ -157,10 +184,9 @@ function Dashboard() {
     if (!isStillNeeded) ctrl.removeRequest(destFloor)
   }
 
-  // 5. 문 열림 시 탑승/하차 (정위치 실패 시 차단)
+  // 문 열림 시 탑승/하차
   useEffect(() => {
-    // [수정] 정위치 실패(isMisaligned) 상태면 탑승 로직 차단
-    if (doorState !== "open" || isMisaligned) return
+    if (doorState !== "open" || isMisaligned) return // 정위치 실패 시 탑승 차단
 
     setPassengers((prev) => {
       const boardingTargets = []
@@ -180,21 +206,22 @@ function Dashboard() {
   }, [doorState, currentFloor, ctrl, isMisaligned])
 
   // 로그 자동 추가
+  // 정위치 실패는 2초 지난 뒤에 로그 찍히게 수정 (불필요한 로그 방지)
   useEffect(() => {
-    if (isMisaligned) {
-      addLogEntry({ timestamp: new Date().toISOString(), level: 'WARN', message: '정위치 정차 실패 감지' })
+    if (isMisaligned && misalignWaitTime > 2000) {
+      addLogEntry({ timestamp: new Date().toISOString(), level: 'WARN', message: '[WARN] 정위치 정차 실패 (2초 경과)' })
     }
-  }, [isMisaligned, addLogEntry])
+  }, [isMisaligned, misalignWaitTime, addLogEntry])
 
   useEffect(() => {
     if (isOverload) {
-      addLogEntry({ timestamp: new Date().toISOString(), level: 'ALERT', message: '과부하 알림 (500kg 초과)' })
+      addLogEntry({ timestamp: new Date().toISOString(), level: 'ALERT', message: '[ALERT] 과부하 알림 (500kg 초과)' })
     }
   }, [isOverload, addLogEntry])
 
   useEffect(() => {
     if (hasJammedOnboard) {
-      addLogEntry({ timestamp: new Date().toISOString(), level: 'ALERT', message: '문 끼임 승객 감지' })
+      addLogEntry({ timestamp: new Date().toISOString(), level: 'ALERT', message: '[ALERT] 문 끼임 승객 감지' })
     }
   }, [hasJammedOnboard, addLogEntry])
 
@@ -211,7 +238,6 @@ function Dashboard() {
                {isConnected ? "● Online" : "○ Offline"}
             </p>
             <p>
-              {/* [수정] displayFloor 사용 */}
               현재 층: <b>{displayFloor}</b> <span style={{ color: statusColor }}>({statusLabel})</span>
             </p>
             <p className="queue-info">대기 큐: {queue.length === 0 ? "없음" : queue.join(" → ")}</p>
@@ -367,63 +393,90 @@ function Dashboard() {
           </div>
         </div>
 
-        {/* [오른쪽] 센서-시나리오 분석 행렬 (Sensor-Scenario Matrix) */}
         <div className="backend-card" style={{marginTop: "24px"}}>
               <h3>🛡️ 자율 제어 센서 분석 행렬</h3>
               
               {(() => {
-                // 1. 각 센서별 상태 판단 (0: 정상, 1: 비정상/위험)
-                const s_Floor = (displayFloor < 1 || displayFloor > 5) ? 1 : 0;
-                const s_Pos   = isMisaligned ? 1 : 0;
-                const s_Speed = (doorState.includes("open") && Math.abs(speedFloorsPerSec) > 0.1) ? 1 : 0;
-                const s_Door  = hasJammedOnboard ? 1 : 0;
-                const s_Load  = isOverload ? 1 : 0;
+                // --- [1] 센서 데이터 (Input) ---
+                const s_DoorObj   = hasJammedOnboard ? 1 : 0; 
+                const s_Overload  = isOverload ? 1 : 0;       
+                // 위치 오차: 정수 층에서 0.1 이상 벗어남 (실시간)
+                const isPosError  = Math.abs(realtimeFloor - Math.round(realtimeFloor)) > 0.1 ? 1 : 0;
+                
+                // 모터 구동 여부 (속도가 0.01 이상이면 1)
+                const isMotorRun  = (Math.abs(speedFloorsPerSec) > 0.01 || direction !== "idle") ? 1 : 0;
+                
+                // 문 닫힘 시도 (문이 닫혀있거나 닫는 중)
+                const s_DoorClose = (doorState === "closing" || doorState === "closed") ? 1 : 0;
 
-                // 2. 시나리오별 행렬 데이터 구성
+                // ★핵심 변경★ 2초 대기 후 여부 (2000ms 넘으면 1)
+                const isWaitOver = misalignWaitTime > 2000 ? 1 : 0;
+
+                // --- [2] 안전 로직 (Logic) ---
                 const matrixRows = [
                   { 
-                    id: "SC1", 
-                    name: "1. 정위치 제어", 
-                    bits: [0, s_Pos, 0, 0, 0], 
-                    active: s_Pos === 1 
+                    id: "JAM", 
+                    name: "1. 승객 끼임 사고", 
+                    desc: "물체 감지 + 문 닫힘 시도",
+                    bits: [s_DoorObj, 0, 0, 0, s_DoorClose], 
+                    fault: s_DoorObj && s_DoorClose 
                   },
                   { 
-                    id: "SC2", 
-                    name: "2. 하중 제어", 
-                    bits: [0, 0, 0, 0, s_Load], 
-                    active: s_Load === 1 
+                    id: "OVL", 
+                    name: "2. 과부하 운행", 
+                    desc: "과부하 + 모터 구동",
+                    bits: [0, s_Overload, 0, isMotorRun, 0], 
+                    fault: s_Overload 
                   },
                   { 
-                    id: "SC3", 
-                    name: "3. 승객 안전", 
-                    bits: [0, 0, s_Speed, s_Door, 0], 
-                    active: (s_Speed === 1 || s_Door === 1)
+                    id: "LVL", 
+                    name: "3. 정위치 이탈", 
+                    desc: "위치오차 + 정지(2초 경과)", // 설명 업데이트
+                    // [ 물체감지, 과부하, 위치오차, 정지(2s), 닫힘시도 ]
+                    // 위치오차(1) AND 정지후2초(1) 이면 위험!
+                    bits: [0, 0, isPosError, isWaitOver, 0], 
+                    fault: isPosError && isWaitOver
                   },
                 ];
 
-                const sensors = ["현재층", "카위치", "속도", "문상태", "적재량"];
+                // 컬럼 헤더 수정: 4번째를 '구동/정지' -> '구동/대기' 등으로 의미 확장
+                const sensors = ["물체감지", "과부하", "위치오차", "구동/대기", "닫힘시도"];
+
+                const isSystemFault = matrixRows.some(r => r.fault);
 
                 return (
                   <div className="matrix-wrapper">
                     <table className="sensor-matrix">
                       <thead>
                         <tr>
-                          <th className="matrix-corner">SCENARIO \ SENSOR</th>
+                          <th className="matrix-corner">SCENARIO</th>
                           {sensors.map((s, i) => <th key={i}>{s}</th>)}
-                          <th className="matrix-result-header">판정</th>
+                          <th className="matrix-result-header">STATUS</th>
                         </tr>
                       </thead>
                       <tbody>
                         {matrixRows.map((row) => (
-                          <tr key={row.id} className={row.active ? "row-alert" : ""}>
-                            <td className="scenario-name">{row.name}</td>
-                            {row.bits.map((bit, i) => (
-                              <td key={i} className={`bit-cell ${bit === 1 ? "on" : "off"}`}>
-                                {bit}
-                              </td>
-                            ))}
+                          <tr key={row.id} className={row.fault ? "row-alert" : ""}>
+                            <td className="scenario-name" title={row.desc}>
+                              {row.name}
+                              <div style={{fontSize:'0.65rem', fontWeight:'normal', opacity:0.7}}>
+                                {row.desc}
+                              </div>
+                            </td>
+                            {row.bits.map((bit, i) => {
+                              const isRelevant = 
+                                (row.id === "JAM" && (i===0 || i===4)) ||
+                                (row.id === "OVL" && (i===1 || i===3)) ||
+                                (row.id === "LVL" && (i===2 || i===3));
+                              
+                              return (
+                                <td key={i} className={`bit-cell ${bit === 1 ? "on" : "off"} ${!isRelevant && bit===0 ? "dim" : ""}`}>
+                                  {isRelevant || bit === 1 ? bit : <span style={{opacity:0.1}}>0</span>}
+                                </td>
+                              )
+                            })}
                             <td className="scenario-result">
-                              {row.active ? "🚨 위험" : "✅ 정상"}
+                              {row.fault ? "🚨 DANGER" : "✅ SAFE"}
                             </td>
                           </tr>
                         ))}
@@ -431,10 +484,10 @@ function Dashboard() {
                     </table>
 
                     <div className="system-summary">
-                      System Status: 
-                      {matrixRows.some(r => r.active) 
-                        ? <span className="crit"> ⚠️ ABNORMAL DETECTED</span> 
-                        : <span className="norm"> ✅ ALL SYSTEMS NORMAL</span>
+                      System Diagnosis: 
+                      {isSystemFault 
+                        ? <span className="crit"> 🛑 OPERATION HALTED</span> 
+                        : <span className="norm"> 🟢 SYSTEM NORMAL</span>
                       }
                     </div>
                   </div>

@@ -637,115 +637,144 @@ body {
   font-size: 0.85rem;
 }
 
-/* src/page/Dashboard.css 맨 아래 추가 */
+/* src/page/Dashboard.css 맨 아래 추가 (기존 행렬 스타일 대체) */
 
-/* === 센서-시나리오 매핑 행렬 스타일 === */
+/* === 센서-시나리오 분석 행렬 (Clean Style) === */
 .matrix-wrapper {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 0; /* 테이블과 요약바 사이 틈 없애기 */
+  border-radius: 12px;
+  overflow: hidden; /* 둥근 모서리 적용 */
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.05);
 }
 
 .sensor-matrix {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.85rem;
-  border: 2px solid #334155; /* 외곽선 진하게 */
+  background: #fff;
 }
 
-/* 헤더 스타일 */
+/* --- 헤더 스타일 --- */
 .sensor-matrix th {
-  background: #1e293b;
-  color: #94a3b8;
-  padding: 10px 4px;
-  font-weight: 700;
-  border: 1px solid #334155;
+  background: #1e293b; /* 짙은 네이비 */
+  color: #94a3b8;      /* 연한 회색 텍스트 */
+  padding: 12px 8px;
+  font-weight: 600;
+  border-bottom: 2px solid #334155;
   text-align: center;
+  letter-spacing: 0.5px;
 }
 
 .matrix-corner {
   background: #0f172a !important;
-  color: #cbd5e1 !important;
+  color: #fff !important;
   font-size: 0.75rem;
-  letter-spacing: 0.5px;
+  width: 140px; /* 시나리오 이름 칸 너비 고정 */
 }
 
 .matrix-result-header {
   background: #334155 !important;
   color: #fff !important;
+  width: 100px;
 }
 
-/* 행(Row) 스타일 */
+/* --- 본문 행(Row) 스타일 --- */
+.sensor-matrix td {
+  padding: 10px 4px;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+}
+
+/* 시나리오 이름 */
 .scenario-name {
-  background: #f1f5f9;
-  font-weight: 700;
+  background: #f8fafc;
   color: #475569;
-  padding: 10px 8px;
-  border: 1px solid #cbd5e1;
-  width: 120px; /* 시나리오 제목 너비 고정 */
+  font-weight: 700;
+  border-right: 1px solid #e2e8f0;
+  padding-left: 16px !important;
 }
 
-/* 비트 셀 (0/1) 스타일 */
+/* 비트 셀 (0/1) */
 .bit-cell {
   text-align: center;
-  font-family: 'Consolas', 'Monaco', monospace; /* 코딩 폰트 */
+  font-family: 'Menlo', 'Consolas', monospace;
   font-size: 1.1rem;
-  font-weight: 800;
-  border: 1px solid #e2e8f0;
-  width: 50px; /* 셀 너비 고정 */
+  font-weight: 700;
+  color: #cbd5e1; /* 기본(0)은 연하게 */
+  transition: all 0.2s ease;
 }
 
-.bit-cell.off {
-  color: #cbd5e1; /* 0은 흐리게 */
-  background: #fff;
+/* 해당 시나리오와 관련 없는 센서 (흐리게 처리) */
+.bit-cell.dim {
+  color: #e2e8f0;
+  background-color: #fcfcfc;
 }
 
+/* 활성화된 1 (위험 신호) */
 .bit-cell.on {
-  color: #ef4444; /* 1은 빨갛게 */
-  background: #fef2f2;
-  box-shadow: inset 0 0 10px rgba(239, 68, 68, 0.1);
-  animation: pulseBit 1s infinite;
+  color: #ef4444;
+  background-color: #fef2f2;
+  font-weight: 900;
+  transform: scale(1.1);
+  box-shadow: inset 0 0 0 1px #fee2e2;
+  border-radius: 6px;
 }
 
-/* 위험 발생 시 행 강조 */
-.row-alert .scenario-name {
-  color: #b91c1c;
-  background: #fee2e2;
-}
-
+/* --- 결과 컬럼 --- */
 .scenario-result {
   text-align: center;
   font-weight: 700;
   font-size: 0.8rem;
-  border: 1px solid #cbd5e1;
-  background: #f8fafc;
+  color: #10b981; /* 기본 정상(Green) */
+}
+
+/* --- 위험 상황 발생 시 (Row Highlight) --- */
+.row-alert .scenario-name {
+  color: #b91c1c;
+  background: #fef2f2;
+  border-left: 4px solid #ef4444; /* 왼쪽 빨간띠 포인트 */
 }
 
 .row-alert .scenario-result {
-  color: #fff;
-  background: #ef4444;
-  animation: blinkBg 1s infinite;
+  color: #dc2626; /* 위험(Red) */
+  background: #fee2e2;
 }
 
-/* 하단 요약 바 */
+/* --- 하단 요약 바 (Status Bar) --- */
 .system-summary {
   background: #0f172a;
-  color: #fff;
-  padding: 8px 12px;
-  border-radius: 4px;
-  font-family: monospace;
-  font-size: 0.9rem;
-  text-align: right;
+  color: #e2e8f0;
+  padding: 10px 16px;
+  font-family: 'Menlo', monospace;
+  font-size: 0.85rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid #334155;
 }
 
-.norm { color: #4ade80; font-weight: 700; }
-.crit { color: #f87171; font-weight: 700; animation: blink 0.5s infinite; }
-
-/* 애니메이션 */
-@keyframes pulseBit {
-  50% { transform: scale(1.2); }
+.norm { 
+  color: #4ade80; 
+  font-weight: 700; 
+  display: flex; 
+  align-items: center; 
+  gap: 6px;
 }
 
-@keyframes blinkBg {
-  50% { background-color: #b91c1c; }
+.crit { 
+  color: #f87171; 
+  font-weight: 700; 
+  display: flex; 
+  align-items: center; 
+  gap: 6px;
+  animation: textFlash 1s infinite;
+}
+
+/* --- 애니메이션 --- */
+@keyframes textFlash {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
 }
