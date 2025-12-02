@@ -221,20 +221,20 @@ function Dashboard() {
   useEffect(() => {
     // 2초가 지났고 && 아직 로그를 안 찍었을 때만 실행
     if (isMisaligned && misalignWaitTime > 2000 && !misalignLoggedRef.current) {
-      addLogEntry({ timestamp: new Date().toISOString(), level: 'WARN', message: '[WARN] 정위치 정차 실패 (2초 경과 - 위험 감지)' })
+      addLogEntry({ timestamp: new Date().toISOString(), level: 'WARN', message: '정위치 정차 실패 (2초 경과 - 위험 감지)' })
       misalignLoggedRef.current = true; // 로그 찍음 표시
     }
   }, [isMisaligned, misalignWaitTime, addLogEntry])
 
   useEffect(() => {
     if (isOverload) {
-      addLogEntry({ timestamp: new Date().toISOString(), level: 'ALERT', message: '[ALERT] 과부하 알림 (500kg 초과)' })
+      addLogEntry({ timestamp: new Date().toISOString(), level: 'ALERT', message: '과부하 알림 (500kg 초과)' })
     }
   }, [isOverload, addLogEntry])
 
   useEffect(() => {
     if (hasJammedOnboard) {
-      addLogEntry({ timestamp: new Date().toISOString(), level: 'ALERT', message: '[ALERT] 문 끼임 승객 감지' })
+      addLogEntry({ timestamp: new Date().toISOString(), level: 'ALERT', message: '문 끼임 승객 감지' })
     }
   }, [hasJammedOnboard, addLogEntry])
 
