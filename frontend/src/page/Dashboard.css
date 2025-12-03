@@ -1,30 +1,37 @@
+/* src/page/Dashboard.css */
+
 :root {
-  --card-radius: 32px;
+  --card-radius: 24px; /* 조금 더 단정하게 조정 */
   --accent: #fb923c;
   --accent-soft: rgba(251, 146, 60, 0.18);
   --primary: #2563eb;
   --muted: #6b7280;
   --bg-soft: #f3f4f6;
-  --shadow-soft: 0 24px 60px rgba(15, 23, 42, 0.18);
+  --shadow-soft: 0 20px 40px rgba(15, 23, 42, 0.08); /* 그림자 부드럽게 */
+  --shadow-hover: 0 25px 50px rgba(15, 23, 42, 0.12);
 }
 
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
-    "Segoe UI", sans-serif;
-  background: radial-gradient(circle at 0% 0%, #fef3c7, #e5e7eb);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+  background: #f1f5f9; /* 전체 배경색 */
+  color: #1e293b;
 }
 
 .Dashboard {
+  max-width: 1400px;
+  margin: 0 auto;
   min-height: 100vh;
-  padding: 32px 64px 40px;
+  padding: 32px 40px 60px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
 }
 
-/* 헤더 */
-
+/* =========================================
+   헤더 영역
+   ========================================= */
 .dash-header {
   margin-bottom: 24px;
 }
@@ -38,61 +45,68 @@ body {
 
 .dash-header h1 {
   margin: 0 0 8px;
-  font-size: 2.4rem;
-  letter-spacing: 0.04em;
-  color: #111827;
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #0f172a;
 }
 
 .queue-info,
 .capacity-info,
 .speed-info {
-  margin: 3px 0;
+  margin: 4px 0;
   font-size: 0.95rem;
-  color: #4b5563;
+  color: #475569;
 }
 
 .capacity-count.full {
-  color: #b91c1c;
-  font-weight: 600;
+  color: #dc2626;
+  font-weight: 700;
 }
 
 .speed-info {
-  margin-top: 6px;
   font-size: 0.9rem;
   color: var(--muted);
 }
 
-/* 문 상태 */
-
+/* 문 상태 컨트롤 */
 .door-controls {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 10px;
+  gap: 12px;
 }
 
 .door-indicator {
   display: flex;
   align-items: center;
   gap: 8px;
+  background: #fff;
+  padding: 6px 12px;
+  border-radius: 999px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }
 
 .door-indicator-dot {
   width: 10px;
   height: 10px;
-  border-radius: 999px;
+  border-radius: 50%;
   background: #22c55e;
-  box-shadow: 0 0 0 5px rgba(34, 197, 94, 0.2);
+  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.15);
 }
 
 .door-indicator-dot.closed {
   background: #ef4444;
-  box-shadow: 0 0 0 5px rgba(239, 68, 68, 0.2);
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.15);
 }
 
 .door-indicator-label {
-  font-size: 0.9rem;
-  color: #374151;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #334155;
+  display: inline-block;
+  width: 80px;
+  text-align: center;
 }
 
 .door-buttons {
@@ -101,19 +115,19 @@ body {
 }
 
 .door-btn {
-  min-width: 60px;
-  padding: 6px 12px;
-  border-radius: 999px;
+  min-width: 64px;
+  padding: 8px 14px;
+  border-radius: 12px;
   border: none;
   font-size: 0.85rem;
+  font-weight: 600;
   cursor: pointer;
-  transition: transform 0.1s ease, box-shadow 0.1s ease,
-    background-color 0.15s ease;
+  transition: all 0.2s ease;
 }
 
 .door-btn.open {
   background: #dcfce7;
-  color: #166534;
+  color: #15803d;
 }
 
 .door-btn.close {
@@ -123,505 +137,816 @@ body {
 
 .door-btn:disabled {
   opacity: 0.5;
-  cursor: default;
-  box-shadow: none;
-  transform: none;
+  cursor: not-allowed;
+  filter: grayscale(0.5);
 }
 
 .door-btn:not(:disabled):hover {
-  transform: translateY(-1px);
-  box-shadow: 0 8px 16px rgba(15, 23, 42, 0.12);
+  transform: translateY(-2px);
+  filter: brightness(0.95);
 }
 
-/* 메인 3분할 */
-
+/* =========================================
+   메인 레이아웃 (3단 분할)
+   ========================================= */
 .dash-layout {
-  flex: 1;
   display: grid;
-  grid-template-columns: 320px minmax(420px, 1.4fr) 320px;
-  gap: 32px;
+  grid-template-columns: 300px minmax(400px, 1fr) 300px;
+  gap: 24px;
+  align-items: start;
 }
 
-/* 카드 */
-
+/* 패널 공통 스타일 */
 .panel {
   background: #ffffff;
   border-radius: var(--card-radius);
   box-shadow: var(--shadow-soft);
-  padding: 24px 22px 26px;
+  padding: 24px;
   display: flex;
   flex-direction: column;
-  box-sizing: border-box;
-}
-
-.panel h2 {
-  margin: 0 0 4px;
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: #111827;
 }
 
 .panel-subtitle {
-  margin: 0 0 16px;
-  font-size: 0.8rem;
-  color: #9ca3af;
+  margin-top: -8px;    
+  margin-bottom: 20px; 
+  font-size: 0.85rem;  
+  color: #64748b;      
+  line-height: 1.5;   
+  font-weight: 500;   
+  word-break: keep-all; 
 }
 
-/* 버튼들 */
+.panel h2 {
+  margin: 0 0 16px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #0f172a;
+  border-bottom: 2px solid #f1f5f9;
+  padding-bottom: 12px;
+}
 
+/* 버튼 그리드 */
 .panel-buttons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+  gap: 8px;
+  margin-bottom: 20px;
 }
 
 .floor-btn {
-  flex: 1 1 30%;
-  min-width: 50px;
-  padding: 7px 10px;
-  border-radius: 999px;
-  border: 1px solid rgba(148, 163, 184, 0.4);
-  background: #f9fafb;
-  font-size: 0.9rem;
-  color: #111827;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #334155;
+  font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.12s ease, transform 0.1s ease,
-    box-shadow 0.1s ease;
+  transition: all 0.2s;
 }
 
 .floor-btn.inside {
   background: #eff6ff;
-  border-color: rgba(59, 130, 246, 0.5);
+  border-color: #bfdbfe;
+  color: #1d4ed8;
 }
 
 .floor-btn:hover {
-  background: #e5e7eb;
+  background: #e2e8f0;
   transform: translateY(-1px);
-  box-shadow: 0 8px 14px rgba(15, 23, 42, 0.08);
 }
 
-/* 승객 폼/리스트 */
-
-.passenger-section {
-  margin-top: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.passenger-section h3 {
-  margin: 0;
-  font-size: 1rem;
-  color: #111827;
-}
-
+/* =========================================
+   승객 섹션 (오른쪽 패널)
+   ========================================= */
 .passenger-form {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  align-items: flex-end;
-}
-
-.field {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  align-items: center;
+  gap: 6px;
+  background: #f8fafc;
+  padding: 10px;
+  border-radius: 16px;
+  margin-bottom: 16px;
 }
 
-.field label {
-  font-size: 0.8rem;
-  color: #6b7280;
-}
-
-.field select {
-  border-radius: 999px;
-  border: 1px solid rgba(148, 163, 184, 0.7);
-  padding: 6px 10px;
-  font-size: 0.85rem;
-  outline: none;
-}
-
-.add-passenger-btn {
-  grid-column: 1 / -1;
-  border-radius: 999px;
-  border: none;
-  padding: 9px 12px;
-  background: linear-gradient(90deg, #fb923c, #f97316);
-  color: #ffffff;
+.passenger-form select {
+  flex: 1;
+  padding: 6px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
   font-size: 0.9rem;
-  font-weight: 500;
-  cursor: pointer;
-  box-shadow: 0 12px 30px rgba(248, 113, 22, 0.35);
-  transition: transform 0.1s ease, box-shadow 0.1s ease,
-    filter 0.15s ease;
-}
-
-.add-passenger-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 18px 40px rgba(248, 113, 22, 0.45);
-  filter: brightness(1.03);
-}
-
-.passenger-list {
-  margin-top: 6px;
-  border-radius: 18px;
-  background: #f9fafb;
-  padding: 10px 12px;
-  max-height: 180px;
-  overflow-y: auto;
 }
 
 .passenger-empty {
-  margin: 0;
-  font-size: 0.85rem;
-  color: #9ca3af;
+  text-align: center;        /* 가운데 정렬 */
+  padding: 40px 20px;        /* 넉넉한 여백 */
+  color: #94a3b8;            /* 연한 회색 텍스트 */
+  font-size: 0.9rem;
+  background-color: #f8fafc; /* 아주 연한 회색 배경 */
+  border: 2px dashed #e2e8f0;/* 점선 테두리로 "비어있음" 표현 */
+  border-radius: 16px;       /* 둥근 모서리 */
+  margin-top: 8px;
+}
+
+.add-passenger-btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  background: var(--accent);
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(251, 146, 60, 0.3);
+  transition: all 0.2s;
+}
+
+.add-passenger-btn:hover {
+  transform: scale(1.05);
+  background: #f97316;
+}
+
+.passenger-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 300px;
+  overflow-y: auto;
 }
 
 .passenger-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  padding: 10px;
+  background: #f8fafc;
+  border-radius: 12px;
   font-size: 0.85rem;
-  padding: 4px 0;
+  border: 1px solid #f1f5f9;
 }
 
-.passenger-route {
-  color: #111827;
+.passenger-item.jammed-item {
+  border-color: #fca5a5;
+  background: #fef2f2;
 }
 
 .passenger-status {
-  font-size: 0.8rem;
-  border-radius: 999px;
+  font-size: 0.75rem;
   padding: 2px 8px;
+  border-radius: 99px;
+  font-weight: 600;
+}
+.passenger-status.waiting { background: #fef3c7; color: #b45309; }
+.passenger-status.onboard { background: #dcfce7; color: #15803d; }
+.passenger-status.done { background: #e2e8f0; color: #64748b; }
+
+.unload-btn {
+  font-size: 0.7rem;
+  padding: 4px 8px;
+  margin-left: 8px;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  background: white;
+  cursor: pointer;
 }
 
-.passenger-status.waiting {
-  background: rgba(251, 191, 36, 0.18);
-  color: #92400e;
-}
-
-.passenger-status.onboard {
-  background: rgba(22, 163, 74, 0.18);
-  color: #166534;
-}
-
-.passenger-status.done {
-  background: rgba(148, 163, 184, 0.25);
-  color: #4b5563;
-}
-
-/* 중앙 엘리베이터 씬 */
-
+/* =========================================
+   샤프트 & 엘리베이터 (중앙)
+   ========================================= */
 .shaft {
   background: #ffffff;
   border-radius: var(--card-radius);
   box-shadow: var(--shadow-soft);
-  padding: 26px 32px;
+  padding: 32px;
   display: flex;
   justify-content: center;
-  align-items: center;
+  min-height: 600px;
 }
 
 .shaft-scene {
   position: relative;
-  width: 360px;
-  height: 600px; /* 5층 * 110 + 여유 */
-  border-radius: 26px;
-  background: linear-gradient(180deg, #e5f0ff, #f9fafb);
-  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.22);
+  width: 320px;
+  height: 600px; /* 5층 * 110px + 여유 */
+  background: linear-gradient(to bottom, #f1f5f9, #e2e8f0);
+  border-radius: 16px;
   overflow: hidden;
+  box-shadow: inset 0 0 20px rgba(0,0,0,0.05);
 }
-
-/* 층 레이어 */
 
 .floor-layer {
   position: absolute;
-  left: 0;
-  right: 0;
+  left: 0; right: 0;
   height: 110px;
-}
-
-.floor-line {
-  position: absolute;
-  left: 24px;
-  right: 24px;
-  bottom: 0;
-  height: 2px;
-  background: rgba(148, 163, 184, 0.5);
+  border-bottom: 1px solid rgba(0,0,0,0.06);
 }
 
 .floor-label-side {
   position: absolute;
-  left: 26px;
-  bottom: 4px;
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: #6b7280;
-}
-
-/* 대기 승객 – 네모 */
-
-.floor-waiting-side {
-  position: absolute;
-  right: 46px;
+  left: 16px;
   bottom: 8px;
-  display: flex;
-  gap: 6px;
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #cbd5e1;
 }
-
-.passenger-dot.waiting.side {
-  width: 12px;
-  height: 12px;
-  border-radius: 3px; /* 네모 */
-  background: #f97316;
-  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.18);
-}
-
-/* 샤프트 벽 */
 
 .shaft-wall {
   position: absolute;
-  right: 140px;
-  bottom: 30px;                    /* 카드의 맨 아래에서 시작 */
-  height: calc(5 * 110px);      /* 4 * FLOOR_HEIGHT = 440px */
+  right: 120px;
+  top: 20px;
+  bottom: 20px;
   width: 4px;
-  border-radius: 999px;
-  background: rgba(15, 23, 42, 0.24);
+  background: rgba(0,0,0,0.1);
+  border-radius: 4px;
+  z-index: 0;
 }
 
-/* 엘리베이터 캐빈(측면) */
-
+/* 엘리베이터 카 */
 .elevator-car.side {
   position: absolute;
-  left: 15%;
-  width: 150px;
+  left: 50%;
+  transform: translateX(-50%); /* 중앙 정렬 */
+  width: 140px;
   height: 90px;
-  border-radius: 18px;
-  /* 여기서 ease-in-out으로 가속/감속 느낌 */
-  transition: bottom 0.9s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 12px;
+  /* 부드러운 이동 애니메이션 */
+  transition: bottom 0.5s cubic-bezier(0.45, 0, 0.55, 1);
+  z-index: 10;
 }
 
 .car-inner {
-  position: relative;
   width: 100%;
   height: 100%;
-  border-radius: 18px;
-  background: radial-gradient(circle at 10% 0%, #ecfeff, #dbeafe);
-  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.4);
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+  border: 2px solid #3b82f6;
+  position: relative;
   overflow: hidden;
 }
 
-/* 문 – 직각, 중앙에서 양쪽으로 열림 */
-
+/* 문 스타일 */
 .car-door.side {
   position: absolute;
-  inset: 8px 12px 8px 12px;
-  border-radius: 0;
-  overflow: hidden;
-  pointer-events: none;
+  top: 0; bottom: 0; left: 0; right: 0;
+  display: flex;
 }
 
 .door-panel {
-  position: absolute;
-  top: 0;
   width: 50%;
   height: 100%;
-  background: rgba(248, 250, 252, 0.97);
-  border-radius: 0;
-  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.4);
-  transition: transform 0.35s ease;
+  background: rgba(226, 232, 240, 0.95);
+  border: 1px solid #cbd5e1;
+  transition: transform 0.4s ease;
 }
 
-.door-panel.left {
-  left: 0;
-  transform: translateX(0);
+/* 문 열림 애니메이션 */
+.car-door.side.door-open .door-panel.left,
+.car-door.side.door-opening .door-panel.left {
+  transform: translateX(-95%);
+}
+.car-door.side.door-open .door-panel.right,
+.car-door.side.door-opening .door-panel.right {
+  transform: translateX(95%);
 }
 
-.door-panel.right {
-  right: 0;
-  transform: translateX(0);
+/* 승객(점) 시각화 */
+.floor-waiting-side {
+  position: absolute;
+  right: 20px;
+  bottom: 10px;
+  display: flex;
+  gap: 4px;
 }
-
-.car-door.side.door-opening .door-panel.left,
-.car-door.side.door-open .door-panel.left {
-  transform: translateX(-101%);
-}
-
-.car-door.side.door-opening .door-panel.right,
-.car-door.side.door-open .door-panel.right {
-  transform: translateX(101%);
-}
-
-.car-door.side.door-closing .door-panel.left,
-.car-door.side.door-closed .door-panel.left {
-  transform: translateX(0);
-}
-
-.car-door.side.door-closing .door-panel.right,
-.car-door.side.door-closed .door-panel.right {
-  transform: translateX(0);
-}
-
-/* 캐빈 안 승객 – 네모 */
 
 .car-people-inside {
   position: absolute;
-  left: 18px;
-  bottom: 12px;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
-  gap: 8px;
-  align-items: flex-end;
+  gap: 4px;
+  z-index: 5;
 }
 
-.passenger-dot.inside {
-  width: 14px;
-  height: 14px;
-  border-radius: 3px;
-  background: #22c55e;
-  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.22);
-}
-
-/* 푸터 */
-
-.dash-footer {
-  margin-top: 24px;
-  font-size: 0.8rem;
-  color: #9ca3af;
-  text-align: center;
-}
-
-.unload-btn {
-  margin-left: 8px;
-  padding: 2px 8px;
-  font-size: 11px;
+.passenger-dot {
+  width: 12px;
+  height: 12px;
   border-radius: 4px;
-  border: 1px solid #e5e7eb;
-  background: #f9fafb;
-  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
 }
-.unload-btn:disabled {
-  opacity: 0.5;
-  cursor: default;
+.passenger-dot.waiting { background: #f59e0b; }
+.passenger-dot.inside { background: #22c55e; }
+.passenger-dot.jammed { background: #ef4444; animation: blink 1s infinite; }
+
+@keyframes blink {
+  50% { opacity: 0.5; }
 }
 
-/* 끼임 승객(빨간 네모) */
-.passenger-dot.jammed {
-  background-color: #ef4444; /* 빨간색 */
+/* =========================================
+   [NEW] 백엔드 연동 패널 (하단)
+   ========================================= */
+.backend-panel {
+  margin-top: 32px;
+  background: #fff;
+  border-radius: var(--card-radius);
+  box-shadow: var(--shadow-soft);
+  padding: 32px;
+  border-top: 4px solid #64748b; /* 시각적 구분 */
 }
 
-/* 승객 리스트에서 끼임 승객 표시 */
-.passenger-item.jammed-item .passenger-route {
-  color: #b91c1c;
+.backend-header {
+  margin-bottom: 24px;
+}
+
+.backend-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: #0f172a;
+}
+
+.backend-subtitle {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.backend-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+}
+
+.backend-card h3 {
+  margin: 0 0 16px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #334155;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.backend-card h3::before {
+  content: '';
+  display: block;
+  width: 6px;
+  height: 20px;
+  background: #3b82f6;
+  border-radius: 2px;
+}
+
+/* 센서 데이터 테이블 */
+.backend-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  table-layout: fixed;
+}
+
+.backend-table th,
+.backend-table td {
+  padding: 12px 8px;
+  text-align: left;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.backend-table th {
+  color: #64748b;
   font-weight: 600;
+  font-size: 0.85rem;
 }
 
-/* 끼임 승객 생성 버튼 */
-.jam-section {
-  margin-top: 16px;
-  padding-top: 8px;
-  border-top: 1px solid #e5e7eb;
+.backend-table td {
+  color: #334155;
+  font-feature-settings: "tnum"; /* 숫자 등폭 */
+}
+
+.backend-table tr:last-child td {
+  border-bottom: none;
+}
+
+/* 로그 리스트 (터미널 느낌) */
+.backend-log {
+  display: flex;
+  flex-direction: column;
+}
+
+.backend-log-list {
+  flex: 1;
+  background: #1e293b;
+  border-radius: 12px;
+  padding: 16px;
+  font-family: 'Menlo', 'Consolas', monospace;
+  font-size: 0.85rem;
+  color: #e2e8f0;
+  overflow-y: auto;
+  max-height: 240px;
+  box-shadow: inset 0 2px 10px rgba(0,0,0,0.3);
+}
+
+.backend-log-hint {
+  font-size: 0.8rem;
+  color: #94a3b8;
+  margin-bottom: 12px;
+  line-height: 1.4;
+}
+
+.backend-log-item {
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed #334155;
+}
+
+.backend-log-item:last-child {
+  border-bottom: none;
+}
+
+/* 테스트용 버튼들 (끼임, 정위치 실패) */
+.jam-section, .level-section {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px dashed #e2e8f0;
 }
 
 .jam-btn {
-  padding: 6px 10px;
-  font-size: 12px;
-  border-radius: 6px;
-  border: 1px solid #ef4444;
+  width: 100%;
+  padding: 10px;
   background: #fef2f2;
-  color: #b91c1c;
+  color: #ef4444;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  font-weight: 600;
   cursor: pointer;
-}
-
-.jam-btn:hover {
-  background: #fee2e2;
 }
 
 .jam-hint {
-  margin-top: 6px;
-  font-size: 11px;
-  color: #6b7280;
+  margin-top: 10px;         
+  font-size: 0.8rem;      
+  line-height: 1.5;          
+  color: #991b1b;            
+  padding: 10px 12px;        
+  border-radius: 12px;    
+  word-break: keep-all;     
 }
-
-/* ===========================
-   정위치 정차 실패 테스트 섹션
-   =========================== */
 
 .level-section {
-  margin-top: 18px;
-  padding: 12px 14px;
-  border-radius: 10px;
-  border: 1px solid #facc15;         /* 노란 테두리 */
-  background: linear-gradient(135deg, #fefce8, #fffbeb);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.level-section h3 {
-  margin: 0 0 8px;
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: #92400e;                     /* 진한 주황/브라운 톤 */
-}
-
-/* 두 버튼 공통 스타일 */
-.level-error-btn,
-.level-fix-btn {
-  width: 100%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 7px 10px;
-  margin-bottom: 6px;
+.level-error-btn {
+  background: #fffbeb;
+  color: #d97706;
+  border: 1px solid #fde68a;
+  padding: 10px;
   border-radius: 8px;
-  border: 1px solid transparent;
-  font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.18s ease, border-color 0.18s ease,
-    transform 0.08s ease, box-shadow 0.18s ease, color 0.18s ease;
 }
 
-/* 정위치 실패 유도 버튼 (살짝 경고 느낌) */
-.level-error-btn {
+.level-fix-btn {
+  background: #eff6ff;
+  color: #2563eb;
+  border: 1px solid #bfdbfe;
+  padding: 10px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.level-fix-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #f1f5f9;
+  color: #94a3b8;
+  border-color: #e2e8f0;
+}
+
+.level-hint {
+  margin-top: 10px;            /* 버튼과 간격 */
+  font-size: 0.8rem;           /* 작고 깔끔한 폰트 */
+  line-height: 1.5;            /* 줄간격 확보 */
+  color: #854d0e;              /* 가독성 좋은 진한 황갈색 텍스트 */
+  padding: 10px 12px;          /* 내부 여백 */
+  border-radius: 12px;         /* 둥근 모서리 */
+  word-break: keep-all;        /* 한글 단어 중간 끊김 방지 */
+}
+
+.dash-footer {
+  margin-top: 40px;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 0.85rem;
+}
+
+/* src/page/Dashboard.css 맨 아래 추가 (기존 행렬 스타일 대체) */
+
+/* === 센서-시나리오 분석 행렬 (Clean Style) === */
+.matrix-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 0; /* 테이블과 요약바 사이 틈 없애기 */
+  border-radius: 12px;
+  overflow: hidden; /* 둥근 모서리 적용 */
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+}
+
+.sensor-matrix {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  background: #fff;
+}
+
+/* --- 헤더 스타일 --- */
+.sensor-matrix th {
+  background: #1e293b; /* 짙은 네이비 */
+  color: #94a3b8;      /* 연한 회색 텍스트 */
+  padding: 12px 8px;
+  font-weight: 600;
+  border-bottom: 2px solid #334155;
+  text-align: center;
+  letter-spacing: 0.5px;
+}
+
+.matrix-corner {
+  background: #0f172a !important;
+  color: #fff !important;
+  font-size: 0.75rem;
+  width: 140px; /* 시나리오 이름 칸 너비 고정 */
+}
+
+.matrix-result-header {
+  background: #334155 !important;
+  color: #fff !important;
+  width: 100px;
+}
+
+/* --- 본문 행(Row) 스타일 --- */
+.sensor-matrix td {
+  padding: 10px 4px;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+}
+
+/* 시나리오 이름 */
+.scenario-name {
+  background: #f8fafc;
+  color: #475569;
+  font-weight: 700;
+  border-right: 1px solid #e2e8f0;
+  padding-left: 16px !important;
+}
+
+/* 비트 셀 (0/1) */
+.bit-cell {
+  text-align: center;
+  font-family: 'Menlo', 'Consolas', monospace;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #cbd5e1; /* 기본(0)은 연하게 */
+  transition: all 0.2s ease;
+}
+
+/* 해당 시나리오와 관련 없는 센서 (흐리게 처리) */
+.bit-cell.dim {
+  color: #e2e8f0;
+  background-color: #fcfcfc;
+}
+
+/* 활성화된 1 (위험 신호) */
+.bit-cell.on {
+  color: #ef4444;
+  background-color: #fef2f2;
+  font-weight: 900;
+  transform: scale(1.1);
+  box-shadow: inset 0 0 0 1px #fee2e2;
+  border-radius: 6px;
+}
+
+/* --- 결과 컬럼 --- */
+.scenario-result {
+  text-align: center;
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: #10b981; /* 기본 정상(Green) */
+}
+
+/* --- 위험 상황 발생 시 (Row Highlight) --- */
+.row-alert .scenario-name {
+  color: #b91c1c;
+  background: #fef2f2;
+  border-left: 4px solid #ef4444; /* 왼쪽 빨간띠 포인트 */
+}
+
+.row-alert .scenario-result {
+  color: #dc2626; /* 위험(Red) */
+  background: #fee2e2;
+}
+
+/* --- 하단 요약 바 (Status Bar) --- */
+.system-summary {
+  background: #0f172a;
+  color: #e2e8f0;
+  padding: 10px 16px;
+  font-family: 'Menlo', monospace;
+  font-size: 0.85rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid #334155;
+}
+
+.norm { 
+  color: #4ade80; 
+  font-weight: 700; 
+  display: flex; 
+  align-items: center; 
+  gap: 6px;
+}
+
+.crit { 
+  color: #f87171; 
+  font-weight: 700; 
+  display: flex; 
+  align-items: center; 
+  gap: 6px;
+  animation: textFlash 1s infinite;
+}
+
+/* --- 애니메이션 --- */
+@keyframes textFlash {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* src/page/Dashboard.css 맨 아래 추가 */
+
+/* === 데이터 검증 테이블 스타일 === */
+.comparison-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.comparison-table th {
+  background: #f1f5f9;
+  color: #64748b;
+  font-weight: 700;
+  padding: 12px;
+  text-align: center;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.comparison-table td {
+  padding: 12px;
+  text-align: center;
+  border-bottom: 1px solid #f1f5f9;
+  font-family: 'Menlo', monospace;
+}
+
+/* 항목 이름 */
+.comp-label {
+  font-weight: 700;
+  color: #334155;
+  background: #f8fafc;
+  width: 150px;
+}
+
+/* 값 표시 (Safe / Danger) */
+.val-safe { color: #10b981; font-weight: 600; }
+.val-danger { color: #ef4444; font-weight: 700; background: #fef2f2; }
+
+/* 진단 결과 뱃지 */
+.comp-result {
+  font-weight: 800;
+  border-radius: 6px;
+}
+
+.status-ok {
+  color: #10b981;
+}
+
+.status-fp {
+  color: #b45309;
+  background-color: #fffbeb;
+  border: 1px solid #fcd34d;
+  animation: pulseWarning 2s infinite;
+}
+
+.status-fn {
+  color: #b91c1c;
+  background-color: #fef2f2;
+  border: 1px solid #fca5a5;
+  animation: pulseCritical 1s infinite;
+}
+
+/* 자율제어 모드 토글 */
+.auto-mode-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.auto-mode-label {
+  font-size: 0.8rem;
+  color: #4b5563;
+}
+
+.auto-mode-chip {
+  border-radius: 999px;
+  padding: 2px 12px;
+  font-size: 0.75rem;
+  border: 1px solid #d1d5db;
+  background: #f9fafb;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.auto-mode-chip.on {
+  background: #ecfdf5;
+  border-color: #22c55e;
+  color: #15803d;
+  font-weight: 600;
+}
+
+.auto-mode-chip.off {
+  background: #fef2f2;
+  border-color: #f97373;
+  color: #b91c1c;
+}
+
+/* FP/FN 작은 버튼 */
+.tiny-inject-btn {
+  min-width: 46px;
+  padding: 4px 8px;
+  font-size: 0.7rem;
+  border-radius: 999px;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.tiny-inject-btn:hover {
+  background: #f3f4f6;
+}
+
+.tiny-inject-btn.active-fp {
+  background: #fffbeb;
+  border-color: #f59e0b;
+  color: #b45309;
+  font-weight: 600;
+}
+
+.tiny-inject-btn.active-fn {
+  background: #fef2f2;
+  border-color: #ef4444;
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+/* 데이터 무결성 상태 뱃지 */
+.status-ok {
+  color: #15803d;
+}
+
+.status-fp {
+  color: #b45309;
+}
+
+.status-fn {
+  color: #b91c1c;
+}
+
+/* 시나리오 행렬 안에 붙는 상태 뱃지 */
+.scenario-status-pill {
+  margin-top: 4px;
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+}
+
+.scenario-status-pill.status-ok {
+  background: #ecfdf5;
+  border-color: #bbf7d0;
+  color: #15803d;
+}
+
+.scenario-status-pill.status-fp {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #b45309;
+}
+
+.scenario-status-pill.status-fn {
   background: #fef2f2;
   border-color: #fecaca;
   color: #b91c1c;
-  box-shadow: 0 1px 2px rgba(185, 28, 28, 0.12);
-}
-
-.level-error-btn:hover {
-  background: #fee2e2;
-  border-color: #fca5a5;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(185, 28, 28, 0.18);
-}
-
-/* 정위치 자동 수정 버튼 (고쳐주는 느낌이라 파랑/초록 계열) */
-.level-fix-btn {
-  background: #eff6ff;
-  border-color: #bfdbfe;
-  color: #1d4ed8;
-  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.12);
-}
-
-.level-fix-btn:hover:not(:disabled) {
-  background: #dbeafe;
-  border-color: #93c5fd;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.18);
-}
-
-/* 비활성화 상태 */
-.level-fix-btn:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-  box-shadow: none;
-  transform: none;
-}
-
-/* 설명 텍스트 */
-.level-hint {
-  margin-top: 4px;
-  font-size: 0.75rem;
-  line-height: 1.3;
-  color: #92400e;
 }

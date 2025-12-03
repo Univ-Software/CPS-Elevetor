@@ -7,32 +7,35 @@ import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
 
 /**
- * WebSocket configuration for real-time elevator control communication.
- * Configures STOMP over WebSocket for bidirectional messaging between frontend and backend.
+ * WebSocket configuration for STOMP messaging
+ * Enables WebSocket communication between frontend and backend
  */
 @Configuration
 @EnableWebSocketMessageBroker
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     /**
-     * Configure message broker for pub/sub messaging.
-     * - /topic: prefix for messages broadcast to all subscribers
-     * - /app: prefix for messages routed to @MessageMapping annotated methods
+     * Configure message broker for pub/sub messaging
+     * - /topic: for broadcasting to multiple subscribers
+     * - /app: for application destination prefix (handled by @MessageMapping)
      */
     @Override
     public void configureMessageBroker(MessageBrokerRegistry config) {
+        // Enable simple broker for /topic destinations
         config.enableSimpleBroker("/topic");
+
+        // Set application destination prefix for @MessageMapping
         config.setApplicationDestinationPrefixes("/app");
     }
 
     /**
-     * Register STOMP endpoints for WebSocket connections.
-     * Endpoint: /ws
-     * Allows all origins for development (should be restricted in production)
+     * Register STOMP endpoints with SockJS fallback
+     * Frontend connects to: http://localhost:8088/ws
      */
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         registry.addEndpoint("/ws")
-                .setAllowedOrigins("*");
+                .setAllowedOriginPatterns("*")  // Allow all origins (adjust for production)
+                .withSockJS();  // Enable SockJS fallback for browsers without WebSocket support
     }
 }
