@@ -60,6 +60,10 @@ public class SensorData {
     @Column(name = "processed_timestamp")
     private LocalDateTime processedTimestamp;
 
+    // 🔹 프론트에서만 쓰는 자율제어 모드 플래그 (DB에는 저장 안 함)
+    @Transient
+    private Boolean autonomousMode;
+
     @PrePersist
     protected void onCreate() {
         processedTimestamp = LocalDateTime.now();

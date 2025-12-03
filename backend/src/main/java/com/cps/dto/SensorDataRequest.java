@@ -21,4 +21,7 @@ public class SensorDataRequest {
     private Boolean isOverloaded;       // Overload status
     private Boolean isJammed;           // Door jam status
     private String timestamp;           // ISO timestamp from frontend
+
+    // 🔹 프론트에서 보내는 자율제어 모드 (ON/OFF)
+    private Boolean autonomousMode;
 }

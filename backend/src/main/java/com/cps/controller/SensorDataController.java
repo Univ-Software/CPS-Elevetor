@@ -64,9 +64,8 @@ public class SensorDataController {
                 // Step 6: Log with appropriate danger level
                 loggerService.logSensorData(savedData);
 
-                // ▼▼▼ [추가된 부분] Step 6-1: 자율 제어 분석 및 명령 전송 실행 ▼▼▼
+                // Step 6-1: 자율 제어 분석 및 명령 전송 실행
                 loggerService.analyzeAndSendCommand(savedData);
-                // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
                 // Step 7: Build and return response (broadcast to frontend)
                 return buildSuccessResponse(savedData);
@@ -83,12 +82,12 @@ public class SensorDataController {
         }
     }
 
-    // --- Helper Methods (변경 없음) ---
+    // --- Helper Methods ---
 
     private SensorData buildSensorData(SensorDataRequest request,
-                                     DangerLevel dangerLevel,
-                                     String analysisMessage,
-                                     LocalDateTime receivedTimestamp) {
+                                       DangerLevel dangerLevel,
+                                       String analysisMessage,
+                                       LocalDateTime receivedTimestamp) {
         return SensorData.builder()
                 .elevatorId(request.getElevatorId())
                 .currentFloor(request.getCurrentFloor())
@@ -101,6 +100,8 @@ public class SensorDataController {
                 .dangerLevel(dangerLevel.name())
                 .analysisMessage(analysisMessage)
                 .receivedTimestamp(receivedTimestamp)
+                // 🔹 프론트에서 온 자율제어 모드 플래그 그대로 저장
+                .autonomousMode(request.getAutonomousMode())
                 .build();
     }
 
@@ -118,6 +119,8 @@ public class SensorDataController {
                 .dangerLevel(savedData.getDangerLevel())
                 .analysisMessage(savedData.getAnalysisMessage())
                 .processedTimestamp(savedData.getProcessedTimestamp().toString())
+                // 🔹 응답에도 자율제어 모드 포함 (원하면 프론트에서 표시 가능)
+                .autonomousMode(savedData.getAutonomousMode())
                 .build();
     }
 

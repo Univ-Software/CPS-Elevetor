@@ -26,4 +26,7 @@ public class SensorDataResponse {
     private String dangerLevel;         // LOW, NORMAL, WATCH, CRITICAL
     private String analysisMessage;     // Human-readable analysis result
     private String processedTimestamp;  // Server processing timestamp
+
+    // 🔹 이 레코드를 생성할 때 프론트가 어떤 모드였는지(자율제어 ON/OFF)
+    private Boolean autonomousMode;
 }

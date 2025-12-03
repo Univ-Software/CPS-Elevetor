@@ -7,18 +7,34 @@ const DOOR_OPEN_TIME = 1000;
 const DOOR_CLOSE_TIME = 1000;
 const DOOR_DWELL_TIME = 2000;
 
-export function useElevatorController({ isOverload, hasJammedOnboard }) {
+/**
+ * 엘리베이터 컨트롤러 훅
+ *
+ * - isOverload         : 과부하 센서 (백엔드/센서 레이어에서 오염 가능)
+ * - hasJammedOnboard   : 문 끼임 센서
+ * - isMisalignedSensor : 정위치 센서 (백엔드/센서 판단 포함, 오염 가능)
+ *
+ * 내부의 isMisaligned 는 "물리적인 truth" (테스트 버튼으로 만드는 정위치 실패 상태)
+ */
+export function useElevatorController({
+  isOverload,
+  hasJammedOnboard,
+  isMisalignedSensor = false,
+}) {
   // 상태
   const [currentFloor, setCurrentFloor] = useState(1);
-  const [carFloor, setCarFloor] = useState(1);          // 목표 시각적 위치
+  const [carFloor, setCarFloor] = useState(1); // 목표 시각적 위치
   const [realtimeFloor, setRealtimeFloor] = useState(1); // 실시간 위치 (실수)
   const [queue, setQueue] = useState([]);
   const [direction, setDirection] = useState("idle");
   const [doorState, setDoorState] = useState("closed");
 
   const [moveDuration, setMoveDuration] = useState(0);
+
+  // 정위치 테스트용 모드 + 물리 truth 상태
   const [misalignMode, setMisalignMode] = useState(false);
-  const [isMisaligned, setIsMisaligned] = useState(false);
+  const [isMisaligned, setIsMisaligned] = useState(false); // "실제 정위치 실패" truth
+
   const [speedFloorsPerSec, setSpeedFloorsPerSec] = useState(0);
 
   // 현재 이동 중인 목표 층 (스케줄러용)
@@ -30,13 +46,26 @@ export function useElevatorController({ isOverload, hasJammedOnboard }) {
     timeout: null,
   });
 
+  // 공통 타이머 정리 함수
+  const clearTimers = useCallback(() => {
+    if (timersRef.current.interval) {
+      clearInterval(timersRef.current.interval);
+      timersRef.current.interval = null;
+    }
+    if (timersRef.current.timeout) {
+      clearTimeout(timersRef.current.timeout);
+      timersRef.current.timeout = null;
+    }
+  }, []);
+
   // ----------------------------------------------------
   // 1. 층 호출 요청 (스케줄러 호출 시 realtimeFloor 사용)
   // ----------------------------------------------------
   const requestFloor = useCallback(
     (floor) => {
-      // 정위치 실패 상태면 호출 자체를 무시 (안전장치)
-      if (isMisaligned) {
+      // 정위치 실패 상태(물리 truth 또는 센서)가 있으면 호출 자체를 막는다.
+      const lockByMisalign = isMisaligned || isMisalignedSensor;
+      if (lockByMisalign) {
         console.warn("🚨 Misaligned! Cannot accept new requests.");
         return;
       }
@@ -54,7 +83,7 @@ export function useElevatorController({ isOverload, hasJammedOnboard }) {
         });
       });
     },
-    [currentFloor, realtimeFloor, direction, doorState, isMisaligned]
+    [currentFloor, realtimeFloor, direction, doorState, isMisaligned, isMisalignedSensor]
   );
 
   const removeRequest = useCallback((floor) => {
@@ -65,26 +94,31 @@ export function useElevatorController({ isOverload, hasJammedOnboard }) {
   // 2. 모터 이동 제어 (Retargeting 지원)
   // ----------------------------------------------------
   useEffect(() => {
-    // 정위치 실패 상태면 "일반 주행" 로직만 막고, 속도는 건드리지 않음
-    // (정위치 수정(fixMisalign)에서 속도/위치를 직접 제어하기 때문)
-    if (isMisaligned) {
+    const lockByMisalign = isMisaligned || isMisalignedSensor;
+
+    // 정위치 실패 상태에서는 "일반 주행" 로직만 막는다.
+    // 실제 정위치 보정(fixMisalign)은 별도 타이머로 동작.
+    if (lockByMisalign) {
       activeTargetRef.current = null;
+      setSpeedFloorsPerSec(0);
       return;
     }
 
-    // 1. 이동 불가 조건
+    // 1. 이동 불가 조건 (문이 열려 있으면 주행 X)
     if (doorState !== "closed") {
       if (direction !== "idle") setDirection("idle");
       setSpeedFloorsPerSec(0);
       activeTargetRef.current = null;
+      clearTimers();
       return;
     }
 
-    // 2. 대기 조건
+    // 2. 대기 조건 (큐가 비었으면 정지)
     if (queue.length === 0) {
       if (direction !== "idle") setDirection("idle");
       setSpeedFloorsPerSec(0);
       activeTargetRef.current = null;
+      clearTimers();
       return;
     }
 
@@ -95,6 +129,7 @@ export function useElevatorController({ isOverload, hasJammedOnboard }) {
       setDirection("idle");
       setSpeedFloorsPerSec(0);
       activeTargetRef.current = null;
+      clearTimers();
       return;
     }
 
@@ -106,8 +141,7 @@ export function useElevatorController({ isOverload, hasJammedOnboard }) {
     // --- 이동 시작 (혹은 경로 수정) ---
 
     // 기존 타이머 정리
-    if (timersRef.current.interval) clearInterval(timersRef.current.interval);
-    if (timersRef.current.timeout) clearTimeout(timersRef.current.timeout);
+    clearTimers();
 
     activeTargetRef.current = target; // 목표 갱신
 
@@ -125,7 +159,7 @@ export function useElevatorController({ isOverload, hasJammedOnboard }) {
       const offset = (Math.random() * 2 - 1) * OFFSET_RANGE;
       let misFloor = target + offset;
       visualTargetFloor = Math.max(1, Math.min(5, misFloor)); // 1~5 제한
-      setIsMisaligned(true);
+      setIsMisaligned(true); // 물리 truth로 "정위치 실패" 기록
     }
 
     setCarFloor(visualTargetFloor);
@@ -170,23 +204,34 @@ export function useElevatorController({ isOverload, hasJammedOnboard }) {
 
     // Ref에 저장
     timersRef.current = { interval: intervalId, timeout: timeoutId };
-  }, [queue, currentFloor, doorState, realtimeFloor, isMisaligned, misalignMode, direction]);
+  }, [
+    queue,
+    currentFloor,
+    doorState,
+    realtimeFloor,
+    direction,
+    misalignMode,
+    isMisaligned,
+    isMisalignedSensor,
+    clearTimers,
+  ]);
 
-  // Cleanup
+  // 언마운트 시 타이머 정리
   useEffect(() => {
     return () => {
-      if (timersRef.current.interval) clearInterval(timersRef.current.interval);
-      if (timersRef.current.timeout) clearTimeout(timersRef.current.timeout);
+      clearTimers();
     };
-  }, []);
+  }, [clearTimers]);
 
   // ----------------------------------------------------
   // 3. 자동 문 열림 & 상태 관리
   // ----------------------------------------------------
   useEffect(() => {
+    const lockByMisalign = isMisaligned || isMisalignedSensor;
+
     if (doorState !== "closed") return;
     if (queue.length === 0) return;
-    if (isMisaligned) return;
+    if (lockByMisalign) return; // 정위치 실패 시 자동 문열림 방지
 
     const target = queue[0];
     if (
@@ -196,7 +241,7 @@ export function useElevatorController({ isOverload, hasJammedOnboard }) {
     ) {
       setDoorState("opening");
     }
-  }, [doorState, queue, currentFloor, carFloor, isMisaligned]);
+  }, [doorState, queue, currentFloor, carFloor, isMisaligned, isMisalignedSensor]);
 
   useEffect(() => {
     let timerId;
@@ -225,8 +270,10 @@ export function useElevatorController({ isOverload, hasJammedOnboard }) {
   // 4. 액션 핸들러
   // ----------------------------------------------------
   const openDoor = useCallback(() => {
+    const lockByMisalign = isMisaligned || isMisalignedSensor;
+
     // 정위치 실패 상태에서는 문 열림 방지
-    if (isMisaligned) {
+    if (lockByMisalign) {
       try {
         alert("정위치 실패 상태입니다. 문이 열리지 않습니다.");
       } catch (e) {
@@ -235,10 +282,14 @@ export function useElevatorController({ isOverload, hasJammedOnboard }) {
       return;
     }
 
-    if (doorState === "open" || doorState === "opening" || activeTargetRef.current)
+    if (
+      doorState === "open" ||
+      doorState === "opening" ||
+      activeTargetRef.current
+    )
       return;
     setDoorState("opening");
-  }, [doorState, isMisaligned]);
+  }, [doorState, isMisaligned, isMisalignedSensor]);
 
   const closeDoor = useCallback(() => {
     if (doorState === "closed" || doorState === "closing") return;
@@ -249,59 +300,74 @@ export function useElevatorController({ isOverload, hasJammedOnboard }) {
     setDoorState("closing");
   }, [doorState, isOverload]);
 
-  const fixMisalign = useCallback(
-    () => {
-      if (!isMisaligned) return;
+  /**
+   * 정위치 보정:
+   * - 현재 realtimeFloor 기준으로 가장 가까운 층으로 스냅
+   * - 물리 truth isMisaligned 를 false 로 정리
+   * - 일반 주행 타이머와는 별도로 동작
+   */
+  const fixMisalign = useCallback(() => {
+    // 현재 위치 기준으로 가장 가까운 층
+    let nearest = Math.round(realtimeFloor);
+    nearest = Math.max(1, Math.min(5, nearest));
 
-      const nearest = Math.round(carFloor);
-      const time = TIME_PER_FLOOR * Math.abs(nearest - carFloor);
+    const startPos = realtimeFloor;
+    const dist = Math.abs(nearest - startPos);
 
-      setMoveDuration(time);
+    // 오차가 거의 없으면 바로 스냅
+    if (dist < 0.01) {
+      setCurrentFloor(nearest);
       setCarFloor(nearest);
+      setRealtimeFloor(nearest);
+      setIsMisaligned(false);
+      setSpeedFloorsPerSec(0);
+      return;
+    }
 
-      if (time > 0) {
-        const startTime = performance.now();
-        const startPos = realtimeFloor;
-        const dist = Math.abs(nearest - startPos);
+    // 기존 타이머 모두 중단 (일반 주행 멈춤)
+    clearTimers();
+    activeTargetRef.current = null;
 
-        const fixInterval = setInterval(() => {
-          const now = performance.now();
-          const elapsed = now - startTime;
-          const progress = Math.min(elapsed / time, 1);
+    const time = Math.max(TIME_PER_FLOOR * dist, 300);
 
-          if (progress >= 1) {
-            setSpeedFloorsPerSec(0);
-            setRealtimeFloor(nearest);
-            clearInterval(fixInterval);
-            return;
-          }
+    setMoveDuration(time);
+    setCarFloor(nearest);
+    setIsMisaligned(true); // "보정 중" 상태 플래그
 
-          const avgSpeed = dist / (time / 1000);
-          const currentSpeed =
-            avgSpeed * (Math.PI / 2) * Math.sin(Math.PI * progress);
-          setSpeedFloorsPerSec(currentSpeed);
+    const startTime = performance.now();
 
-          const ease = -(Math.cos(Math.PI * progress) - 1) / 2;
-          const currentPos = startPos + (nearest - startPos) * ease;
-          setRealtimeFloor(currentPos);
-        }, 50);
+    const fixInterval = setInterval(() => {
+      const now = performance.now();
+      const progress = Math.min((now - startTime) / time, 1);
 
-        setTimeout(() => {
-          setCurrentFloor(nearest);
-          setIsMisaligned(false);
-          setSpeedFloorsPerSec(0);
-          setRealtimeFloor(nearest);
-          clearInterval(fixInterval);
-        }, time);
-      } else {
-        setCurrentFloor(nearest);
-        setRealtimeFloor(nearest);
-        setIsMisaligned(false);
-        setSpeedFloorsPerSec(0);
+      // Ease-in-out 위치 보정
+      const ease = -(Math.cos(Math.PI * progress) - 1) / 2;
+      const pos = startPos + (nearest - startPos) * ease;
+      setRealtimeFloor(pos);
+
+      // 속도 업데이트
+      const avgSpeed = dist / (time / 1000);
+      const currentSpeed =
+        avgSpeed * (Math.PI / 2) * Math.sin(Math.PI * progress);
+      setSpeedFloorsPerSec(progress < 1 ? currentSpeed : 0);
+
+      if (progress >= 1) {
+        clearInterval(fixInterval);
       }
-    },
-    [isMisaligned, carFloor, realtimeFloor]
-  );
+    }, 50);
+
+    const timeoutId = setTimeout(() => {
+      setCurrentFloor(nearest);
+      setRealtimeFloor(nearest);
+      setCarFloor(nearest);
+      setSpeedFloorsPerSec(0);
+      setIsMisaligned(false); // 보정 완료
+      clearInterval(fixInterval);
+    }, time);
+
+    // 타이머 ref에 저장 (언마운트/재시작 시 정리 위해)
+    timersRef.current = { interval: fixInterval, timeout: timeoutId };
+  }, [realtimeFloor, clearTimers]);
 
   // ----------------------------------------------------
   // 5. 외부로 노출할 컨트롤러 객체
@@ -318,7 +384,7 @@ export function useElevatorController({ isOverload, hasJammedOnboard }) {
       doorState,
       moveDuration,
       speedFloorsPerSec,
-      isMisaligned,
+      isMisaligned, // 물리 truth (Dashboard에서 ground truth로 사용)
       isMoving, // UI용
 
       requestFloor,

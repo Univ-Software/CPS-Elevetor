@@ -21,10 +21,6 @@ public class SensorDataRestController {
 
     private final SensorDataRepository sensorDataRepository;
 
-    /**
-     * Get all sensor data records
-     * GET /api/sensor-data
-     */
     @GetMapping
     public ResponseEntity<List<SensorDataResponse>> getAllSensorData() {
         List<SensorData> data = sensorDataRepository.findAll();
@@ -34,10 +30,6 @@ public class SensorDataRestController {
         return ResponseEntity.ok(responses);
     }
 
-    /**
-     * Get sensor data by elevator ID
-     * GET /api/sensor-data/elevator/{elevatorId}
-     */
     @GetMapping("/elevator/{elevatorId}")
     public ResponseEntity<List<SensorDataResponse>> getByElevatorId(@PathVariable String elevatorId) {
         List<SensorData> data = sensorDataRepository.findByElevatorIdOrderByProcessedTimestampDesc(elevatorId);
@@ -47,10 +39,6 @@ public class SensorDataRestController {
         return ResponseEntity.ok(responses);
     }
 
-    /**
-     * Get latest N records for an elevator
-     * GET /api/sensor-data/elevator/{elevatorId}/latest?limit=10
-     */
     @GetMapping("/elevator/{elevatorId}/latest")
     public ResponseEntity<List<SensorDataResponse>> getLatestByElevatorId(
             @PathVariable String elevatorId,
@@ -62,10 +50,6 @@ public class SensorDataRestController {
         return ResponseEntity.ok(responses);
     }
 
-    /**
-     * Get sensor data by danger level
-     * GET /api/sensor-data/danger-level/{level}
-     */
     @GetMapping("/danger-level/{level}")
     public ResponseEntity<List<SensorDataResponse>> getByDangerLevel(@PathVariable String level) {
         List<SensorData> data = sensorDataRepository.findByDangerLevelOrderByProcessedTimestampDesc(level.toUpperCase());
@@ -75,20 +59,12 @@ public class SensorDataRestController {
         return ResponseEntity.ok(responses);
     }
 
-    /**
-     * Get count of records by danger level
-     * GET /api/sensor-data/stats/danger-level/{level}/count
-     */
     @GetMapping("/stats/danger-level/{level}/count")
     public ResponseEntity<Long> countByDangerLevel(@PathVariable String level) {
         long count = sensorDataRepository.countByDangerLevel(level.toUpperCase());
         return ResponseEntity.ok(count);
     }
 
-    /**
-     * Get a single sensor data record by ID
-     * GET /api/sensor-data/{id}
-     */
     @GetMapping("/{id}")
     public ResponseEntity<SensorDataResponse> getById(@PathVariable Long id) {
         return sensorDataRepository.findById(id)
@@ -114,6 +90,8 @@ public class SensorDataRestController {
                 .dangerLevel(data.getDangerLevel())
                 .analysisMessage(data.getAnalysisMessage())
                 .processedTimestamp(data.getProcessedTimestamp().toString())
+                // 🔹 조회용 응답에도 자율제어 모드 포함
+                .autonomousMode(data.getAutonomousMode())
                 .build();
     }
 }

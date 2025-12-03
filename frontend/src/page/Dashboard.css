@@ -843,3 +843,110 @@ body {
   border: 1px solid #fca5a5;
   animation: pulseCritical 1s infinite;
 }
+
+/* 자율제어 모드 토글 */
+.auto-mode-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.auto-mode-label {
+  font-size: 0.8rem;
+  color: #4b5563;
+}
+
+.auto-mode-chip {
+  border-radius: 999px;
+  padding: 2px 12px;
+  font-size: 0.75rem;
+  border: 1px solid #d1d5db;
+  background: #f9fafb;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.auto-mode-chip.on {
+  background: #ecfdf5;
+  border-color: #22c55e;
+  color: #15803d;
+  font-weight: 600;
+}
+
+.auto-mode-chip.off {
+  background: #fef2f2;
+  border-color: #f97373;
+  color: #b91c1c;
+}
+
+/* FP/FN 작은 버튼 */
+.tiny-inject-btn {
+  min-width: 46px;
+  padding: 4px 8px;
+  font-size: 0.7rem;
+  border-radius: 999px;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.tiny-inject-btn:hover {
+  background: #f3f4f6;
+}
+
+.tiny-inject-btn.active-fp {
+  background: #fffbeb;
+  border-color: #f59e0b;
+  color: #b45309;
+  font-weight: 600;
+}
+
+.tiny-inject-btn.active-fn {
+  background: #fef2f2;
+  border-color: #ef4444;
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+/* 데이터 무결성 상태 뱃지 */
+.status-ok {
+  color: #15803d;
+}
+
+.status-fp {
+  color: #b45309;
+}
+
+.status-fn {
+  color: #b91c1c;
+}
+
+/* 시나리오 행렬 안에 붙는 상태 뱃지 */
+.scenario-status-pill {
+  margin-top: 4px;
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+}
+
+.scenario-status-pill.status-ok {
+  background: #ecfdf5;
+  border-color: #bbf7d0;
+  color: #15803d;
+}
+
+.scenario-status-pill.status-fp {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #b45309;
+}
+
+.scenario-status-pill.status-fn {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #b91c1c;
+}
